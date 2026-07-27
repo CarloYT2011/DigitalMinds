@@ -249,6 +249,7 @@
     }
     .topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
     .topbar-btn svg { width: 17px; height: 17px; }
+    #menu-btn { display: none; }
     .notif-dot {
       position: absolute; top: 6px; right: 6px;
       width: 7px; height: 7px; border-radius: 50%;
@@ -801,16 +802,27 @@
       .notes-wrap { grid-template-columns: 1fr; }
       .pomo-wrap { grid-template-columns: 1fr; }
     }
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 99; opacity: 0; transition: opacity .2s ease;
+    }
+    .sidebar-overlay.show { display: block; opacity: 1; }
     @media (max-width: 640px) {
       :root { --sidebar-w: 0px; }
-      .sidebar { transform: translateX(-220px); }
-      .sidebar.open { transform: translateX(0); width: 220px; }
+      #menu-btn { display: grid !important; }
+      .sidebar {
+        transform: translateX(-240px); width: 220px;
+        box-shadow: none; transition: transform .25s ease, box-shadow .25s ease;
+      }
+      .sidebar.open { transform: translateX(0); box-shadow: 12px 0 32px rgba(0,0,0,.35); }
       .main { margin-left: 0; }
       .day-row { flex-direction: column; align-items: stretch; gap: 8px; }
       .day-row-head { flex-direction: row; justify-content: flex-start; gap: 10px; padding-top: 0; }
       .day-row-head .day-num { margin-top: 0; }
       .content { padding: 16px; }
       .topbar { padding: 10px 16px; }
+      .search-box { width: 140px; }
+      .search-box:focus-within { width: 180px; }
     }
   </style>
 </head>
@@ -857,6 +869,7 @@
   <div class="layout">
 
     <!-- SIDEBAR -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
         <div class="logo-icon">
@@ -963,7 +976,7 @@
     <!-- MAIN -->
     <div class="main">
       <header class="topbar">
-        <button class="topbar-btn" onclick="toggleSidebar()" style="display:none" id="menu-btn">
+        <button class="topbar-btn" onclick="toggleSidebar()" id="menu-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <span class="topbar-title" id="topbar-title">Resumen</span>
@@ -1485,6 +1498,18 @@ function loginAs(u) {
   navigate('resumen');
 }
 
+function resetAuthForm() {
+  ['login-user','login-pass','reg-user','reg-pass','reg-pass2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const loginErr = document.getElementById('login-error');
+  const regErr = document.getElementById('reg-error');
+  if (loginErr) loginErr.style.display = 'none';
+  if (regErr) regErr.style.display = 'none';
+  showAuthTab('login');
+}
+
 async function doLogout() {
   const ok = await customConfirm('Vas a cerrar tu sesión en este navegador.', { title:'¿Cerrar sesión?', okText:'Cerrar sesión', danger:false });
   if (!ok) return;
@@ -1492,6 +1517,7 @@ async function doLogout() {
   currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
+  resetAuthForm();
 }
 
 function toggleProfileMenu(e) {
@@ -1527,6 +1553,7 @@ async function deleteAccount() {
   currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
+  resetAuthForm();
   toast('Cuenta eliminada', 'info');
 }
 
@@ -1579,6 +1606,8 @@ function navigate(sec) {
   if (sec==='notas') renderNotes();
   if (sec==='notificaciones') renderNotifs();
   if (sec==='pomodoro') renderPomoTaskSel();
+
+  if (window.innerWidth <= 640) closeSidebar();
 }
 
 function renderAll() {
@@ -1596,6 +1625,11 @@ function statsVisible() {
 ============================================================ */
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
 }
 
 /* ============================================================
@@ -2830,10 +2864,6 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   const session = lsGet('dm_session', null);
   if (session) {
     loginAs(session);
-  }
-  // Mobile menu button visibility
-  if (window.innerWidth <= 640) {
-    document.getElementById('menu-btn').style.display = '';
   }
 })();
 </script>
