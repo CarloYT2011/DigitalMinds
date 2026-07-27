@@ -1374,6 +1374,24 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
+<!-- ===================== FIREBASE ===================== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBsAIDOUjusTPbB3dYRDMMK-4PCYEy8LoI",
+    authDomain: "digital-minds-205ad.firebaseapp.com",
+    projectId: "digital-minds-205ad",
+    storageBucket: "digital-minds-205ad.firebasestorage.app",
+    messagingSenderId: "944213815526",
+    appId: "1:944213815526:web:7cf3059d4271a020ba4b27"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
 /* ============================================================
@@ -1457,46 +1475,128 @@ function showAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
 }
 
-function doLogin() {
-  const u = document.getElementById('login-user').value.trim();
-  const p = document.getElementById('login-pass').value;
-  const err = document.getElementById('login-error');
-  const accounts = lsGet('dm_accounts', {});
-  if (!accounts[u]) { err.textContent='Usuario no encontrado'; err.style.display='block'; return; }
-  if (accounts[u] !== btoa(p)) { err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
-  err.style.display='none';
-  loginAs(u);
+/* Firebase Auth exige un correo; usamos el "usuario" para armar uno interno,
+   asi la pantalla sigue pidiendo solo un nombre de usuario, no un email real. */
+function usernameToEmail(u) { return `${u}@digitalminds.user`; }
+
+function authErrorMessage(err) {
+  const map = {
+    'auth/user-not-found': 'Usuario no encontrado',
+    'auth/wrong-password': 'Contraseña incorrecta',
+    'auth/invalid-credential': 'Usuario o contraseña incorrectos',
+    'auth/invalid-login-credentials': 'Usuario o contraseña incorrectos',
+    'auth/email-already-in-use': 'Ese usuario ya existe',
+    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+    'auth/network-request-failed': 'Sin conexión a internet. Revisa tu red e intenta de nuevo.',
+  };
+  return map[err.code] || 'Ocurrió un error, intenta de nuevo';
 }
 
-function doRegister() {
-  const u = document.getElementById('reg-user').value.trim();
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim().toLowerCase();
+  const p = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-error');
+  err.style.display = 'none';
+  if (!u || !p) { err.textContent = 'Completa usuario y contraseña'; err.style.display = 'block'; return; }
+  try {
+    await auth.signInWithEmailAndPassword(usernameToEmail(u), p);
+  } catch (e) {
+    err.textContent = authErrorMessage(e); err.style.display = 'block';
+  }
+}
+
+async function doRegister() {
+  const u = document.getElementById('reg-user').value.trim().toLowerCase();
   const p = document.getElementById('reg-pass').value;
   const p2 = document.getElementById('reg-pass2').value;
   const err = document.getElementById('reg-error');
-  if (!u || u.length < 2) { err.textContent='El usuario debe tener al menos 2 caracteres'; err.style.display='block'; return; }
-  if (p.length < 4) { err.textContent='La contraseña debe tener al menos 4 caracteres'; err.style.display='block'; return; }
+  err.style.display = 'none';
+  if (!u || u.length < 2 || !/^[a-z0-9_.]+$/.test(u)) { err.textContent='Usa un usuario de al menos 2 caracteres (letras, números, "_" o ".")'; err.style.display='block'; return; }
+  if (p.length < 6) { err.textContent='La contraseña debe tener al menos 6 caracteres'; err.style.display='block'; return; }
   if (p !== p2) { err.textContent='Las contraseñas no coinciden'; err.style.display='block'; return; }
-  const accounts = lsGet('dm_accounts', {});
-  if (accounts[u]) { err.textContent='Ese usuario ya existe'; err.style.display='block'; return; }
-  accounts[u] = btoa(p);
-  lsSet('dm_accounts', accounts);
-  err.style.display='none';
-  loginAs(u);
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(usernameToEmail(u), p);
+    await cred.user.updateProfile({ displayName: u });
+  } catch (e) {
+    err.textContent = authErrorMessage(e); err.style.display = 'block';
+  }
 }
 
-function loginAs(u) {
-  currentUser = u;
-  lsSet('dm_session', u);
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('sidebar-username').textContent = u;
-  document.getElementById('sidebar-avatar').textContent = u[0].toUpperCase();
-  loadSettings();
-  renderAll();
-  requestNotifPermission();
-  startNotifChecker();
-  navigate('resumen');
+/* appData: todo lo del usuario actual, sincronizado con Firestore */
+let appData = defaultAppData();
+let currentUID = null;
+let firestoreUnsub = null;
+let saveTimeout = null;
+
+function defaultAppData() {
+  return { tasks:{}, goals:[], projects:[], notes:[], notifs:[], pomoHistory:[],
+           settings:{ theme:'dark', accent:'#7c6af7', font_size:'15px', notif_enabled:false } };
 }
+
+function scheduleCloudSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    if (!currentUID) return;
+    db.collection('users').doc(currentUID).set(appData, { merge: true }).catch(err => {
+      console.error('Error guardando en la nube:', err);
+      toast('No se pudo guardar en la nube, revisa tu conexión', 'error');
+    });
+  }, 500);
+}
+
+auth.onAuthStateChanged(async (user) => {
+  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+
+  if (user) {
+    currentUID = user.uid;
+    currentUser = user.displayName || (user.email ? user.email.split('@')[0] : 'usuario');
+
+    const docRef = db.collection('users').doc(user.uid);
+    try {
+      const snap = await docRef.get();
+      if (snap.exists) {
+        appData = Object.assign(defaultAppData(), snap.data());
+      } else {
+        appData = defaultAppData();
+        await docRef.set(appData);
+      }
+    } catch (e) {
+      console.error('No se pudo cargar la información de la nube:', e);
+      appData = defaultAppData();
+      toast('No se pudo conectar con la nube, revisa tu internet', 'error');
+    }
+
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('sidebar-username').textContent = currentUser;
+    document.getElementById('sidebar-avatar').textContent = currentUser[0].toUpperCase();
+    loadSettings();
+    renderAll();
+    requestNotifPermission();
+    startNotifChecker();
+    navigate('resumen');
+
+    // Escucha cambios hechos desde otro dispositivo/sesion y refresca la vista
+    firestoreUnsub = docRef.onSnapshot(doc => {
+      if (doc.metadata.hasPendingWrites) return; // ignora el eco de nuestras propias escrituras
+      if (!doc.exists) return;
+      const incoming = Object.assign(defaultAppData(), doc.data());
+      if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
+      appData = incoming;
+      loadSettings();
+      renderAll();
+      const activeNav = document.querySelector('.nav-item.active');
+      if (activeNav) navigate(activeNav.dataset.section);
+      toast('Tus datos se actualizaron desde otro dispositivo', 'info');
+    });
+  } else {
+    currentUID = null;
+    currentUser = null;
+    appData = defaultAppData();
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+});
 
 function resetAuthForm() {
   ['login-user','login-pass','reg-user','reg-pass','reg-pass2'].forEach(id => {
@@ -1511,12 +1611,9 @@ function resetAuthForm() {
 }
 
 async function doLogout() {
-  const ok = await customConfirm('Vas a cerrar tu sesión en este navegador.', { title:'¿Cerrar sesión?', okText:'Cerrar sesión', danger:false });
+  const ok = await customConfirm('Vas a cerrar tu sesión en este dispositivo. Tus datos quedan guardados en la nube.', { title:'¿Cerrar sesión?', okText:'Cerrar sesión', danger:false });
   if (!ok) return;
-  lsSet('dm_session', null);
-  currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
+  await auth.signOut();
   resetAuthForm();
 }
 
@@ -1540,45 +1637,45 @@ document.addEventListener('click', e => {
 });
 
 async function deleteAccount() {
-  if (!currentUser) return;
-  const ok = await customConfirm(`Se borrarán todas tus tareas, metas, proyectos y notas de la cuenta "${currentUser}". Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
+  if (!currentUID) return;
+  const ok = await customConfirm(`Se borrarán todas tus tareas, metas, proyectos y notas de la cuenta "${currentUser}" de la nube. Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
   if (!ok) return;
-  const user = currentUser;
-  const prefix = `dm_${user}_`;
-  Object.keys(localStorage).forEach(k => { if (k.startsWith(prefix)) localStorage.removeItem(k); });
-  const accounts = lsGet('dm_accounts', {});
-  delete accounts[user];
-  lsSet('dm_accounts', accounts);
-  lsSet('dm_session', null);
-  currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
-  resetAuthForm();
-  toast('Cuenta eliminada', 'info');
+  const user = auth.currentUser;
+  try {
+    await db.collection('users').doc(user.uid).delete();
+    await user.delete();
+    toast('Cuenta eliminada', 'info');
+    resetAuthForm();
+  } catch (e) {
+    if (e.code === 'auth/requires-recent-login') {
+      toast('Por seguridad, vuelve a iniciar sesión y luego intenta eliminar tu cuenta de nuevo.', 'error');
+      await auth.signOut();
+    } else {
+      toast('No se pudo eliminar la cuenta: ' + authErrorMessage(e), 'error');
+    }
+  }
 }
 
 /* ============================================================
-   DATOS POR USUARIO
+   DATOS POR USUARIO (sincronizados con Firestore, en memoria en appData)
 ============================================================ */
-function uk(key) { return `dm_${currentUser}_${key}`; }
+function getTasks() { return appData.tasks; }
+function saveTasks(t) { appData.tasks = t; scheduleCloudSave(); }
 
-function getTasks() { return lsGet(uk('tasks'), {}); }
-function saveTasks(t) { lsSet(uk('tasks'), t); }
+function getGoals() { return appData.goals; }
+function saveGoals(g) { appData.goals = g; scheduleCloudSave(); }
 
-function getGoals() { return lsGet(uk('goals'), []); }
-function saveGoals(g) { lsSet(uk('goals'), g); }
+function getProjects() { return appData.projects; }
+function saveProjects(p) { appData.projects = p; scheduleCloudSave(); }
 
-function getProjects() { return lsGet(uk('projects'), []); }
-function saveProjects(p) { lsSet(uk('projects'), p); }
+function getNotes() { return appData.notes; }
+function saveNotes(n) { appData.notes = n; scheduleCloudSave(); }
 
-function getNotes() { return lsGet(uk('notes'), []); }
-function saveNotes(n) { lsSet(uk('notes'), n); }
+function getNotifs() { return appData.notifs; }
+function saveNotifs(n) { appData.notifs = n; scheduleCloudSave(); }
 
-function getNotifs() { return lsGet(uk('notifs'), []); }
-function saveNotifs(n) { lsSet(uk('notifs'), n); }
-
-function getPomoHistory() { return lsGet(uk('pomo_history'), []); }
-function savePomoHistory(h) { lsSet(uk('pomo_history'), h); }
+function getPomoHistory() { return appData.pomoHistory; }
+function savePomoHistory(h) { appData.pomoHistory = h; scheduleCloudSave(); }
 
 /* ============================================================
    NAVEGACIÓN
@@ -2632,7 +2729,7 @@ function updateNotifBadge() {
    NOTIFICACIONES DEL NAVEGADOR
 ============================================================ */
 function requestNotifPermission() {
-  const enabled = lsGet(uk('notif_enabled'), false);
+  const enabled = appData.settings.notif_enabled;
   if (enabled && Notification.permission==='default') Notification.requestPermission();
 }
 
@@ -2650,15 +2747,16 @@ async function toggleNotifications() {
   }
 
   toggle.classList.toggle('on', enabling);
-  lsSet(uk('notif_enabled'), enabling);
+  appData.settings.notif_enabled = enabling;
+  scheduleCloudSave();
 }
 
 let notifCheckerInterval = null;
 function startNotifChecker() {
   clearInterval(notifCheckerInterval);
   notifCheckerInterval = setInterval(() => {
-    if (!currentUser) return;
-    const enabled = lsGet(uk('notif_enabled'), false);
+    if (!currentUID) return;
+    const enabled = appData.settings.notif_enabled;
     if (!enabled) return;
     const tasks = getTasks();
     const todayKey = getToday();
@@ -2680,22 +2778,18 @@ function startNotifChecker() {
    PERSONALIZACIÓN
 ============================================================ */
 function loadSettings() {
-  const theme = lsGet(uk('theme'), 'dark');
-  const accent = lsGet(uk('accent'), '#7c6af7');
-  const fontSize = lsGet(uk('font_size'), '15px');
-  const notifEnabled = lsGet(uk('notif_enabled'), false);
-
-  setTheme(theme, true);
-  setAccent(accent, null, true);
-  setFontSize(fontSize, null, true);
-  document.getElementById('notif-toggle').classList.toggle('on', notifEnabled);
+  const s = appData.settings || {};
+  setTheme(s.theme || 'dark', true);
+  setAccent(s.accent || '#7c6af7', null, true);
+  setFontSize(s.font_size || '15px', null, true);
+  document.getElementById('notif-toggle').classList.toggle('on', !!s.notif_enabled);
 }
 
 function setTheme(t, silent=false) {
   document.documentElement.setAttribute('data-theme', t);
   document.getElementById('btn-dark').classList.toggle('active', t==='dark');
   document.getElementById('btn-light').classList.toggle('active', t==='light');
-  if (!silent) lsSet(uk('theme'), t);
+  if (!silent) { appData.settings.theme = t; scheduleCloudSave(); }
 }
 
 function setAccent(color, swatch, silent=false) {
@@ -2704,14 +2798,14 @@ function setAccent(color, swatch, silent=false) {
   document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));
   if (swatch) swatch.classList.add('active');
   document.getElementById('custom-color').value = color;
-  if (!silent) lsSet(uk('accent'), color);
+  if (!silent) { appData.settings.accent = color; scheduleCloudSave(); }
 }
 
 function setFontSize(size, btn, silent=false) {
   document.documentElement.style.setProperty('--font-size', size);
   document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  if (!silent) lsSet(uk('font_size'), size);
+  if (!silent) { appData.settings.font_size = size; scheduleCloudSave(); }
 }
 
 function hexToRgba(hex, a) {
@@ -2860,12 +2954,8 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 /* ============================================================
    INIT
 ============================================================ */
-(function init() {
-  const session = lsGet('dm_session', null);
-  if (session) {
-    loginAs(session);
-  }
-})();
+/* La sesion ahora la maneja Firebase automaticamente via onAuthStateChanged
+   (definido mas arriba), que se dispara solo al cargar la pagina. */
 </script>
 </body>
 </html>
