@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Digital Minds</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="alternate icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     /* ===================== VARIABLES ===================== */
@@ -230,12 +232,12 @@
     .topbar-title { font-size: 1rem; font-weight: 600; flex: 1; }
     .search-box {
       display: flex; align-items: center; gap: 8px;
-      background: var(--bg3); border: 1px solid var(--border);
+      background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius-sm); padding: 7px 12px;
       width: 220px; transition: var(--transition);
     }
     .search-box:focus-within { border-color: var(--accent); width: 280px; }
-    .search-box svg { width: 15px; height: 15px; stroke: var(--text3); flex-shrink: 0; }
+    .search-box svg { width: 15px; height: 15px; stroke: var(--text2); flex-shrink: 0; }
     .search-box input {
       border: none; background: none; color: var(--text);
       font-size: .85rem; outline: none; width: 100%;
@@ -243,11 +245,12 @@
     .search-box input::placeholder { color: var(--text3); }
     .topbar-btn {
       width: 36px; height: 36px; border-radius: var(--radius-sm);
-      background: var(--bg3); border: 1px solid var(--border);
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text2);
       display: grid; place-items: center; transition: var(--transition);
       position: relative;
     }
-    .topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .topbar-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .topbar-btn svg { width: 17px; height: 17px; }
     #menu-btn { display: none; }
     .notif-dot {
@@ -753,6 +756,11 @@
     .toast.success { border-left: 3px solid var(--success); }
     .toast.error { border-left: 3px solid var(--danger); }
     .toast.info { border-left: 3px solid var(--accent); }
+    .toast-icon { flex-shrink: 0; display: grid; place-items: center; }
+    .toast-icon svg { width: 18px; height: 18px; }
+    .toast.success .toast-icon { color: var(--success); }
+    .toast.error .toast-icon { color: var(--danger); }
+    .toast.info .toast-icon { color: var(--accent); }
     @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
     /* ===================== SEARCH RESULTS ===================== */
@@ -860,7 +868,7 @@
         <button class="btn-primary" onclick="doRegister()">Crear mi cuenta</button>
       </div>
     </div>
-    <p class="auth-note">Tu usuario y contraseña se guardarán en la nube para garantizar la disponibilidad de acceso a tu cuenta.</p>
+    <p class="auth-note">Tu cuenta y tus tareas se guardan en la nube, así que puedes entrar desde cualquier dispositivo con el mismo usuario y contraseña.</p>
   </div>
 </div>
 
@@ -1331,7 +1339,7 @@
     <h3>Nuevo Proyecto</h3>
     <div class="modal-body">
       <div class="field-label">Nombre del proyecto</div>
-      <input type="text" id="proj-name-input" placeholder="Ej: Estudiar para el éxamen"/>
+      <input type="text" id="proj-name-input" placeholder="Ej: Rediseño web, Compras del mes…"/>
       <div class="field-label">Color / Etiqueta</div>
       <select id="proj-color-input">
         <option value="#7c6af7">🟣 Púrpura</option>
@@ -1339,6 +1347,7 @@
         <option value="#22c55e">🟢 Verde</option>
         <option value="#f59e0b">🟡 Amarillo</option>
         <option value="#ef4444">🔴 Rojo</option>
+        <option value="#ec4899">🩷 Rosa</option>
       </select>
     </div>
     <div class="modal-footer">
@@ -1404,12 +1413,19 @@ function getDayKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
+const TOAST_ICONS = {
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+};
+
 function toast(msg, type='info') {
   const tc = document.getElementById('toast-container');
   const t = document.createElement('div');
   t.className = `toast ${type}`;
-  const icons = { info:'', success:'', error:'' };
-  t.innerHTML = `<span>${icons[type]||''}</span><span>${msg}</span>`;
+  const safeMsg = (typeof msg === 'string' && msg.trim()) ? msg : 'Ocurrió un error, intenta de nuevo';
+  t.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</span><span></span>`;
+  t.querySelector('span:last-child').textContent = safeMsg;
   tc.appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
@@ -1612,7 +1628,6 @@ async function handleSession(session) {
         renderAll();
         const activeNav = document.querySelector('.nav-item.active');
         if (activeNav) navigate(activeNav.dataset.section);
-        toast('Tus datos se actualizaron desde otro dispositivo', 'info');
       })
       .subscribe();
   } else {
@@ -1633,8 +1648,8 @@ function resetAuthForm() {
   });
   const loginErr = document.getElementById('login-error');
   const regErr = document.getElementById('reg-error');
-  if (loginErr) loginErr.style.display = 'none';
-  if (regErr) regErr.style.display = 'none';
+  if (loginErr) { loginErr.style.display = 'none'; loginErr.textContent = ''; }
+  if (regErr) { regErr.style.display = 'none'; regErr.textContent = ''; }
   showAuthTab('login');
 }
 
@@ -1666,16 +1681,37 @@ document.addEventListener('click', e => {
 
 async function deleteAccount() {
   if (!currentUID) return;
-  const ok = await customConfirm(`Se borrarán todas tus tareas, metas, proyectos y notas de la cuenta "${currentUser}" de la nube y se cerrará tu sesión. Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
+  const ok = await customConfirm(`Se eliminará por completo la cuenta "${currentUser}" (tus datos y tu usuario), para que ese nombre quede libre. Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
   if (!ok) return;
   try {
-    const { error } = await sb.from('app_data').delete().eq('user_id', currentUID);
-    if (error) throw error;
+    const { data: sessionData } = await sb.auth.getSession();
+    const token = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    if (!token) throw new Error('No se encontró tu sesión');
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || result.error) throw new Error(result.error || 'No se pudo eliminar la cuenta');
+
+    toast('Cuenta eliminada por completo', 'info');
     await sb.auth.signOut();
-    toast('Tus datos fueron eliminados', 'info');
     resetAuthForm();
   } catch (e) {
-    toast('No se pudo eliminar la cuenta: ' + authErrorMessage(e), 'error');
+    // Respaldo: si la funcion de servidor todavia no esta desplegada, al menos borra los datos
+    try {
+      await sb.from('app_data').delete().eq('user_id', currentUID);
+      await sb.auth.signOut();
+      toast('Tus datos fueron eliminados, pero el usuario podría seguir reservado (falta desplegar la función de eliminación en el servidor)', 'info');
+      resetAuthForm();
+    } catch (e2) {
+      toast('No se pudo eliminar la cuenta: ' + (e.message || 'intenta de nuevo'), 'error');
+    }
   }
 }
 
