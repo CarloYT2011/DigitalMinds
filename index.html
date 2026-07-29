@@ -860,7 +860,7 @@
         <button class="btn-primary" onclick="doRegister()">Crear mi cuenta</button>
       </div>
     </div>
-    <p class="auth-note">Tu cuenta y tus tareas se guardan en este navegador. No usan un servidor externo.</p>
+    <p class="auth-note">Tu cuenta y tus tareas se guardan en la nube, así que puedes entrar desde cualquier dispositivo con el mismo usuario y contraseña.</p>
   </div>
 </div>
 
@@ -1374,22 +1374,12 @@
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- ===================== FIREBASE ===================== -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- ===================== SUPABASE ===================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsAIDOUjusTPbB3dYRDMMK-4PCYEy8LoI",
-    authDomain: "digital-minds-205ad.firebaseapp.com",
-    projectId: "digital-minds-205ad",
-    storageBucket: "digital-minds-205ad.firebasestorage.app",
-    messagingSenderId: "944213815526",
-    appId: "1:944213815526:web:7cf3059d4271a020ba4b27"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+  const SUPABASE_URL = "https://dluahapnlzglbtxqlvia.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdWFoYXBubHpnbGJ0eHFsdmlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODIzNDgsImV4cCI6MjEwMDg1ODM0OH0.rCAuHAp1zAEuzDK6oUS5WIlwaL9ktqKf4YrcLS4FMjY";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
 
 <!-- ===================== JAVASCRIPT ===================== -->
@@ -1476,56 +1466,63 @@ function showAuthTab(tab) {
 }
 
 /* Firebase Auth exige un correo; usamos el "usuario" para armar uno interno,
-   asi la pantalla sigue pidiendo solo un nombre de usuario, no un email real. */
-function usernameToEmail(u) { return `${u}@digitalminds.user`; }
+   asi la pantalla sigue pidiendo solo un nombre de usuario, no un email real.
+   Aqui se acepta cualquier texto como usuario (con espacios, acentos, etc.),
+   y por dentro se convierte a un formato valido para el correo interno. */
+function slugifyUsername(u) {
+  const slug = u.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return slug || 'usuario';
+}
+function usernameToEmail(u) { return `${slugifyUsername(u)}@digitalminds.user`; }
 
 function authErrorMessage(err) {
-  const map = {
-    'auth/user-not-found': 'Usuario no encontrado',
-    'auth/wrong-password': 'Contraseña incorrecta',
-    'auth/invalid-credential': 'Usuario o contraseña incorrectos',
-    'auth/invalid-login-credentials': 'Usuario o contraseña incorrectos',
-    'auth/email-already-in-use': 'Ese usuario ya existe',
-    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
-    'auth/network-request-failed': 'Sin conexión a internet. Revisa tu red e intenta de nuevo.',
-  };
-  return map[err.code] || 'Ocurrió un error, intenta de nuevo';
+  const msg = (err && err.message) || '';
+  if (/Invalid login credentials/i.test(msg)) return 'Usuario o contraseña incorrectos';
+  if (/already registered/i.test(msg)) return 'Ese usuario ya existe';
+  if (/Password should be at least/i.test(msg)) return 'La contraseña debe tener al menos 6 caracteres';
+  if (/Email not confirmed/i.test(msg)) return 'Falta desactivar "Confirm email" en Supabase (Authentication → Providers → Email)';
+  if (/network|fetch/i.test(msg)) return 'Sin conexión a internet. Revisa tu red e intenta de nuevo.';
+  return msg || 'Ocurrió un error, intenta de nuevo';
 }
 
 async function doLogin() {
-  const u = document.getElementById('login-user').value.trim().toLowerCase();
+  const u = document.getElementById('login-user').value.trim();
   const p = document.getElementById('login-pass').value;
   const err = document.getElementById('login-error');
   err.style.display = 'none';
   if (!u || !p) { err.textContent = 'Completa usuario y contraseña'; err.style.display = 'block'; return; }
-  try {
-    await auth.signInWithEmailAndPassword(usernameToEmail(u), p);
-  } catch (e) {
-    err.textContent = authErrorMessage(e); err.style.display = 'block';
-  }
+  const { error } = await sb.auth.signInWithPassword({ email: usernameToEmail(u), password: p });
+  if (error) { err.textContent = authErrorMessage(error); err.style.display = 'block'; }
 }
 
 async function doRegister() {
-  const u = document.getElementById('reg-user').value.trim().toLowerCase();
+  const u = document.getElementById('reg-user').value.trim();
   const p = document.getElementById('reg-pass').value;
   const p2 = document.getElementById('reg-pass2').value;
   const err = document.getElementById('reg-error');
   err.style.display = 'none';
-  if (!u || u.length < 2 || !/^[a-z0-9_.]+$/.test(u)) { err.textContent='Usa un usuario de al menos 2 caracteres (letras, números, "_" o ".")'; err.style.display='block'; return; }
-  if (p.length < 6) { err.textContent='La contraseña debe tener al menos 6 caracteres'; err.style.display='block'; return; }
+  if (!u) { err.textContent='Escribe un nombre de usuario'; err.style.display='block'; return; }
+  if (p.length < 6) { err.textContent='La contraseña debe tener al menos 6 caracteres, sin ningún otro requisito'; err.style.display='block'; return; }
   if (p !== p2) { err.textContent='Las contraseñas no coinciden'; err.style.display='block'; return; }
-  try {
-    const cred = await auth.createUserWithEmailAndPassword(usernameToEmail(u), p);
-    await cred.user.updateProfile({ displayName: u });
-  } catch (e) {
-    err.textContent = authErrorMessage(e); err.style.display = 'block';
+  const { data, error } = await sb.auth.signUp({
+    email: usernameToEmail(u),
+    password: p,
+    options: { data: { display_name: u } }
+  });
+  if (error) { err.textContent = authErrorMessage(error); err.style.display = 'block'; return; }
+  if (!data.session) {
+    err.textContent = 'Cuenta creada, pero falta desactivar "Confirm email" en Supabase (Authentication → Providers → Email) para poder entrar automáticamente.';
+    err.style.display = 'block';
   }
 }
 
-/* appData: todo lo del usuario actual, sincronizado con Firestore */
+/* appData: todo lo del usuario actual, sincronizado con Supabase */
 let appData = defaultAppData();
 let currentUID = null;
-let firestoreUnsub = null;
+let realtimeChannel = null;
 let saveTimeout = null;
 
 function defaultAppData() {
@@ -1533,38 +1530,67 @@ function defaultAppData() {
            settings:{ theme:'dark', accent:'#7c6af7', font_size:'15px', notif_enabled:false } };
 }
 
+function mapDbRowToAppData(row) {
+  return {
+    tasks: row.tasks || {},
+    goals: row.goals || [],
+    projects: row.projects || [],
+    notes: row.notes || [],
+    notifs: row.notifs || [],
+    pomoHistory: row.pomo_history || [],
+    settings: Object.assign({ theme:'dark', accent:'#7c6af7', font_size:'15px', notif_enabled:false }, row.settings || {})
+  };
+}
+
+async function loadUserData(uid) {
+  const { data, error } = await sb.from('app_data').select('*').eq('user_id', uid).maybeSingle();
+  if (error) {
+    console.error('No se pudo cargar la información de la nube:', error);
+    toast('No se pudo conectar con la nube, revisa tu internet', 'error');
+    return defaultAppData();
+  }
+  if (!data) {
+    const fresh = defaultAppData();
+    await sb.from('app_data').upsert({
+      user_id: uid, tasks: fresh.tasks, goals: fresh.goals, projects: fresh.projects,
+      notes: fresh.notes, notifs: fresh.notifs, pomo_history: fresh.pomoHistory, settings: fresh.settings
+    });
+    return fresh;
+  }
+  return mapDbRowToAppData(data);
+}
+
 function scheduleCloudSave() {
   clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
+  saveTimeout = setTimeout(async () => {
     if (!currentUID) return;
-    db.collection('users').doc(currentUID).set(appData, { merge: true }).catch(err => {
-      console.error('Error guardando en la nube:', err);
-      toast('No se pudo guardar en la nube, revisa tu conexión', 'error');
+    const { error } = await sb.from('app_data').upsert({
+      user_id: currentUID,
+      tasks: appData.tasks,
+      goals: appData.goals,
+      projects: appData.projects,
+      notes: appData.notes,
+      notifs: appData.notifs,
+      pomo_history: appData.pomoHistory,
+      settings: appData.settings,
+      updated_at: new Date().toISOString()
     });
+    if (error) {
+      console.error('Error guardando en la nube:', error);
+      toast('No se pudo guardar en la nube, revisa tu conexión', 'error');
+    }
   }, 500);
 }
 
-auth.onAuthStateChanged(async (user) => {
-  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+async function handleSession(session) {
+  if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
 
-  if (user) {
-    currentUID = user.uid;
-    currentUser = user.displayName || (user.email ? user.email.split('@')[0] : 'usuario');
+  if (session && session.user) {
+    currentUID = session.user.id;
+    currentUser = (session.user.user_metadata && session.user.user_metadata.display_name)
+      || (session.user.email ? session.user.email.split('@')[0] : 'usuario');
 
-    const docRef = db.collection('users').doc(user.uid);
-    try {
-      const snap = await docRef.get();
-      if (snap.exists) {
-        appData = Object.assign(defaultAppData(), snap.data());
-      } else {
-        appData = defaultAppData();
-        await docRef.set(appData);
-      }
-    } catch (e) {
-      console.error('No se pudo cargar la información de la nube:', e);
-      appData = defaultAppData();
-      toast('No se pudo conectar con la nube, revisa tu internet', 'error');
-    }
+    appData = await loadUserData(currentUID);
 
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -1577,18 +1603,19 @@ auth.onAuthStateChanged(async (user) => {
     navigate('resumen');
 
     // Escucha cambios hechos desde otro dispositivo/sesion y refresca la vista
-    firestoreUnsub = docRef.onSnapshot(doc => {
-      if (doc.metadata.hasPendingWrites) return; // ignora el eco de nuestras propias escrituras
-      if (!doc.exists) return;
-      const incoming = Object.assign(defaultAppData(), doc.data());
-      if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
-      appData = incoming;
-      loadSettings();
-      renderAll();
-      const activeNav = document.querySelector('.nav-item.active');
-      if (activeNav) navigate(activeNav.dataset.section);
-      toast('Tus datos se actualizaron desde otro dispositivo', 'info');
-    });
+    realtimeChannel = sb.channel('app_data_' + currentUID)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `user_id=eq.${currentUID}` }, payload => {
+        if (!payload.new) return;
+        const incoming = mapDbRowToAppData(payload.new);
+        if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
+        appData = incoming;
+        loadSettings();
+        renderAll();
+        const activeNav = document.querySelector('.nav-item.active');
+        if (activeNav) navigate(activeNav.dataset.section);
+        toast('Tus datos se actualizaron desde otro dispositivo', 'info');
+      })
+      .subscribe();
   } else {
     currentUID = null;
     currentUser = null;
@@ -1596,7 +1623,9 @@ auth.onAuthStateChanged(async (user) => {
     document.getElementById('app').style.display = 'none';
     document.getElementById('auth-screen').style.display = 'flex';
   }
-});
+}
+
+sb.auth.onAuthStateChange((_event, session) => { handleSession(session); });
 
 function resetAuthForm() {
   ['login-user','login-pass','reg-user','reg-pass','reg-pass2'].forEach(id => {
@@ -1613,7 +1642,7 @@ function resetAuthForm() {
 async function doLogout() {
   const ok = await customConfirm('Vas a cerrar tu sesión en este dispositivo. Tus datos quedan guardados en la nube.', { title:'¿Cerrar sesión?', okText:'Cerrar sesión', danger:false });
   if (!ok) return;
-  await auth.signOut();
+  await sb.auth.signOut();
   resetAuthForm();
 }
 
@@ -1638,26 +1667,21 @@ document.addEventListener('click', e => {
 
 async function deleteAccount() {
   if (!currentUID) return;
-  const ok = await customConfirm(`Se borrarán todas tus tareas, metas, proyectos y notas de la cuenta "${currentUser}" de la nube. Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
+  const ok = await customConfirm(`Se borrarán todas tus tareas, metas, proyectos y notas de la cuenta "${currentUser}" de la nube y se cerrará tu sesión. Esta acción no se puede deshacer.`, { title:'Eliminar cuenta', okText:'Eliminar cuenta' });
   if (!ok) return;
-  const user = auth.currentUser;
   try {
-    await db.collection('users').doc(user.uid).delete();
-    await user.delete();
-    toast('Cuenta eliminada', 'info');
+    const { error } = await sb.from('app_data').delete().eq('user_id', currentUID);
+    if (error) throw error;
+    await sb.auth.signOut();
+    toast('Tus datos fueron eliminados', 'info');
     resetAuthForm();
   } catch (e) {
-    if (e.code === 'auth/requires-recent-login') {
-      toast('Por seguridad, vuelve a iniciar sesión y luego intenta eliminar tu cuenta de nuevo.', 'error');
-      await auth.signOut();
-    } else {
-      toast('No se pudo eliminar la cuenta: ' + authErrorMessage(e), 'error');
-    }
+    toast('No se pudo eliminar la cuenta: ' + authErrorMessage(e), 'error');
   }
 }
 
 /* ============================================================
-   DATOS POR USUARIO (sincronizados con Firestore, en memoria en appData)
+   DATOS POR USUARIO (sincronizados con Supabase, en memoria en appData)
 ============================================================ */
 function getTasks() { return appData.tasks; }
 function saveTasks(t) { appData.tasks = t; scheduleCloudSave(); }
