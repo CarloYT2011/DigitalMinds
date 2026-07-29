@@ -1408,7 +1408,7 @@ function toast(msg, type='info') {
   const tc = document.getElementById('toast-container');
   const t = document.createElement('div');
   t.className = `toast ${type}`;
-  const icons = { info:'ℹ', success:'✅', error:'❌' };
+  const icons = { info:'', success:'', error:'' };
   t.innerHTML = `<span>${icons[type]||''}</span><span>${msg}</span>`;
   tc.appendChild(t);
   setTimeout(() => t.remove(), 3500);
