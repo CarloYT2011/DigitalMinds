@@ -422,6 +422,24 @@
     .task-del:hover { background: rgba(239,68,68,.15); }
     .task-del svg { width: 11px; height: 11px; stroke: var(--danger); }
     .task-item:hover .task-del { opacity: 1; }
+    .task-edit {
+      width: 20px; height: 20px; border-radius: 6px;
+      display: grid; place-items: center; opacity: 0; color: var(--text3);
+      transition: var(--transition); flex-shrink: 0;
+    }
+    .task-edit:hover { background: var(--accent-soft); color: var(--accent); }
+    .task-edit svg { width: 12px; height: 12px; }
+    .task-item:hover .task-edit { opacity: 1; }
+    .task-item-edit {
+      display: flex; flex-direction: column; gap: 7px;
+      padding: 10px; border-radius: 10px; background: var(--bg3);
+      border: 1px solid var(--accent);
+    }
+    .task-item-edit input[type="text"] {
+      padding: 7px 9px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--bg2); color: var(--text); font-size: .8rem; outline: none;
+    }
+    .task-item-edit input[type="text"]:focus { border-color: var(--accent); }
     .add-task-trigger {
       width: 100%; margin-top: 10px; padding: 8px; border-radius: 10px;
       border: 1.5px dashed var(--border); background: transparent;
@@ -703,6 +721,14 @@
     .notif-title { font-size: .875rem; font-weight: 700; }
     .notif-desc { font-size: .8rem; color: var(--text2); margin-top: 2px; }
     .notif-time { font-size: .72rem; color: var(--text3); margin-top: 4px; }
+    .notif-del {
+      flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+      display: grid; place-items: center; color: var(--text3);
+      opacity: 0; transition: var(--transition);
+    }
+    .notif-item:hover .notif-del { opacity: 1; }
+    .notif-del:hover { background: rgba(239,68,68,.12); color: var(--danger); }
+    .notif-del svg { width: 15px; height: 15px; }
 
     /* ===================== PERSONALIZACIÓN ===================== */
     .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; }
@@ -1355,7 +1381,7 @@
 <!-- Modal: Nueva Meta -->
 <div class="modal-overlay" id="modal-goal">
   <div class="modal">
-    <h3>Nueva Meta / OKR</h3>
+    <h3 id="goal-modal-title">Nueva Meta / OKR</h3>
     <div class="modal-body">
       <div class="field-label">Título de la meta</div>
       <input type="text" id="goal-title-input" placeholder="Ej: Aprender CSS Avanzado en Q2"/>
@@ -1375,15 +1401,15 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-goal')">Cancelar</button>
-      <button class="btn btn-accent" onclick="saveGoal()">Crear meta</button>
+      <button class="btn btn-accent" id="goal-modal-save-btn" onclick="saveGoal()">Crear meta</button>
     </div>
   </div>
 </div>
 
-<!-- Modal: Nuevo Proyecto -->
+<!-- Modal: Proyecto -->
 <div class="modal-overlay" id="modal-project">
   <div class="modal">
-    <h3>Nuevo Proyecto</h3>
+    <h3 id="proj-modal-title">Nuevo Proyecto</h3>
     <div class="modal-body">
       <div class="field-label">Nombre del proyecto</div>
       <input type="text" id="proj-name-input" placeholder="Ej: Rediseño web, Compras del mes…"/>
@@ -1398,7 +1424,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-project')">Cancelar</button>
-      <button class="btn btn-accent" onclick="saveProject()">Crear proyecto</button>
+      <button class="btn btn-accent" id="proj-modal-save-btn" onclick="saveProject()">Crear proyecto</button>
     </div>
   </div>
 </div>
@@ -1458,6 +1484,8 @@ function formatDate(dateStr) {
 function getDayKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
+
+const NOTIF_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAGIUlEQVR4nO3dO1YbSxhF4ZYiGNFN7ohM6NREkDqEETnxiExmB6asVqm7Ve/Hf/YXshbQwdldLcGC0zKYb19+/e59Dajn9f3x1Psa1rpeDGPHsvSNovk3ZvQ40jqGZt+M4SNGqxCqfxOGjxy1Q6j2xRk+SqoVQvEvyvBRU+kQziW/GONHbaU3VqQmho8eSpwG2ScA40cvJbaXFQDjR2+5G0wOgPFjFDlbTAqA8WM0qZuMDoDxY1Qp24wKgPFjdLEbDQ6A8WMWMVsNCoDxYzahm70bAOPHrEK2W/RXIYDZHAbA3R+zu7fh3QAYP6w42jKPQJC2GQB3f1izt2lOAEi7CYC7P6za2jYnAKRdBcDdH9b5G+cEgLR/AXD3h4r11jkBII0AIO28LDz+QI/bPCcApBEApBEApBEApJ14AQxlnACQRgCQRgCQRgCQRgCQRgCdvbw99L4EabwN2snW8J+fPjpciTYCaCjmbk8MbRBAAzmPOYRQFwFUVPL5nhDqIIAKar6wJYSyCKCQHu/mEEM+Asg0wtuYhJCOABKNMHwfIcQjgAgjjn4PMYQhgAAzDd9HCMcI4MDMw/cRwjYC8Fga/R5iuCCATwrD9xECAUgO36ccgmwADP+WYghSATD6cCoxSATA8NNZD8F0AAy/HKshmAuA0ddnKQYzATD89iyEYCYAhxDqszB8x1wAa8RQjqXRr5kOwCGEdFaH70gE4BBCOOvDd6QCWCOGWyqjX5MNwCEEzeE78gE4iiEoD98hAI9CCAz/ggAOWIqB0W8jgAAzh8DwjxFAhJlCYPhhCCDRiDEw+ngEkGmEEBh+OgIoJCOEn8uy/JfyiQw/HwFUEBjDz42P3Q2B0ZdFABVthLA1+j1XMTD8OgiggZe3h5jhX3l++kh6PEIYAqgoZ/g+QqiDACooOXwfIZRFAIXUHP0eYshHAJl6DN9HCOkIINEIw/cRQjwCiDDi6PcQQxgCCDDT8H2EcIwADsw8fB8hbCMAj6XR7yGGCwL4pDB8HyEQgOTwfcohyAbA8G8phiAVAKMPpxKDRAAMP531EEwHwPDLsRqCuQAYfX2WYjATAMNvz0IIZgJwCKE+C8N3zAWwRgzlWBr9mukAHEJIZ3X4jkQADiGEsz58RyqANWK4pTL6NdkAHELQHL4jH4CjGILy8B0C8CiEwPAvCOCApRgY/TYCCDBzCAz/GAFEmCkEhh+GABKNGAOjj0cAmUYIgeGnI4BCMkL4sSzL/ymfyPDzEUAFgTH82PjY3RAYfVkEUNFGCFuj33MVA8OvgwAaeHl7+J76uc9PH19LXguuEUBFOcP3EUIdBFBByeH7CKEsAiik5uj3EEM+AsjUY/g+QkhHAIlGGL6PEOIRQIQRR7+HGMIQQICZhu8jhGMEcGDm4fsIYRsBeCyNfg8xXBDAJ4Xh+wiBACSH71MOQTYAhn9LMQSpABh9OJUYJAJg+Omsh2A6AIZfjtUQzAXA6OuzFIOZABh+exZCMBOAQwj1WRi+Yy6ANWIox9Lo10wH4BBCOqvDdyQCcAghnPXhO1IBrBHDLZXRr8kG4BCC5vAd+QAcxRCUh+8QgEchBIZ/QQAHLMXA6LcRQICZQ2D4xwggwkwhMPwwBJBoxBgYfTwCyDRCCAw/HQEUwt8GnRMBVMBfh54HAVTE/wcYHwE0wH+IGRcBNBQTAsNvgwA62YqB0bdHAJ29vD18Z/j9EACknXtfANATAUAaAUAaAUDa+fX98dT7IoAeXt8fT5wAkEYAkEYAkEYAkHZelr8vBnpfCNCS2zwnAKQRAKT9C4DHIKhYb50TANKuAuAUgHX+xjkBIO0mAE4BWLW1bU4ASNsMgFMA1uxtmhMA0nYD4BSAFUdbPjwBiACzu7dhHoEg7W4AnAKYVch2g04AIsBsQjcb/AhEBJhFzFajXgMQAUYXu9HoF8FEgFGlbDPpXSAiwGhSN5n8NigRYBQ5W8z6OQARoLfcDWb/IIwI0EuJ7RUdL/9sAy2UvOkW/VUITgPUVnpj1QbLaYCSat1cq9+xCQE5aj9VNHtkIQTEaPU43fyZnRBwpPXryK4vWokBy9L3zZPh3rUhCttGe6fwDzRclSHvSmHxAAAAAElFTkSuQmCC";
 
 const TOAST_ICONS = {
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
@@ -2033,10 +2061,16 @@ function renderAgenda() {
   }
 }
 
+let openTaskFormKey = null;
+
 function openAddForm(key) {
+  if (openTaskFormKey && openTaskFormKey !== key) {
+    commitOrCloseAddForm(openTaskFormKey);
+  }
   document.getElementById(`trig-${key}`).style.display = 'none';
   document.getElementById(`form-${key}`).style.display = 'flex';
   document.getElementById(`inp-${key}`).focus();
+  openTaskFormKey = key;
 }
 
 function closeAddForm(key) {
@@ -2048,19 +2082,100 @@ function closeAddForm(key) {
   document.getElementById(`inp-${key}`).value = '';
   document.getElementById(`time-${key}`).value = '';
   document.getElementById(`prio-${key}`).value = 'none';
+  if (openTaskFormKey === key) openTaskFormKey = null;
 }
 
+function commitOrCloseAddForm(key) {
+  const inp = document.getElementById(`inp-${key}`);
+  if (!inp) { if (openTaskFormKey === key) openTaskFormKey = null; return; }
+  if (inp.value.trim()) {
+    addTask(key); // ya guarda y cierra el formulario al re-renderizar
+  } else {
+    closeAddForm(key);
+  }
+}
+
+// Clic fuera del formulario de nueva tarea: guarda si ya se escribió algo, o lo cierra si estaba vacío.
+// No se activa al cambiar de pestaña del navegador, solo con clics reales dentro de la página.
+document.addEventListener('click', e => {
+  if (!openTaskFormKey) return;
+  const form = document.getElementById(`form-${openTaskFormKey}`);
+  const trig = document.getElementById(`trig-${openTaskFormKey}`);
+  if (form && (form.contains(e.target) || (trig && trig.contains(e.target)))) return;
+  commitOrCloseAddForm(openTaskFormKey);
+});
+
+function escapeAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let editingTaskId = null;
+
 function renderTaskItem(t, idx, key) {
+  if (editingTaskId === t.id) {
+    const prio = t.priority || 'none';
+    return `
+      <div class="task-item-edit" data-key="${key}" data-idx="${idx}">
+        <input type="text" id="edit-inp-${t.id}" value="${escapeAttr(t.text)}"
+               onkeydown="if(event.key==='Enter')saveTaskEdit('${key}',${idx}); if(event.key==='Escape')cancelTaskEdit();">
+        <div class="add-task-controls">
+          <input type="time" id="edit-time-${t.id}" value="${t.time||''}">
+          <select id="edit-prio-${t.id}">
+            <option value="none" ${prio==='none'?'selected':''}>Sin prioridad</option>
+            <option value="low" ${prio==='low'?'selected':''}>🟢 Baja</option>
+            <option value="medium" ${prio==='medium'?'selected':''}>🟡 Media</option>
+            <option value="high" ${prio==='high'?'selected':''}>🔴 Alta</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="add-task-btn" style="flex:1" onclick="saveTaskEdit('${key}',${idx})">Guardar</button>
+          <button class="add-task-btn" style="flex:1;background:var(--bg2);color:var(--text2)" onclick="cancelTaskEdit()">Cancelar</button>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="task-item${t.done?' done':''}" draggable="true" data-key="${key}" data-idx="${idx}" data-priority="${t.priority||'none'}" onclick="toggleTask('${key}',${idx})">
       <div class="task-check"></div>
       <span class="task-txt">${t.text}</span>
       ${t.time?`<span class="task-time">${t.time}</span>`:''}
+      <button class="task-edit" onclick="event.stopPropagation(); editTask(${t.id})" title="Editar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
       <button class="task-del" onclick="event.stopPropagation(); deleteTask('${key}',${idx})">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   `;
+}
+
+function editTask(id) {
+  editingTaskId = id;
+  renderAgenda();
+  setTimeout(() => { const el = document.getElementById(`edit-inp-${id}`); if (el) { el.focus(); el.select(); } }, 0);
+}
+
+function cancelTaskEdit() {
+  editingTaskId = null;
+  renderAgenda();
+}
+
+function saveTaskEdit(key, idx) {
+  const tasks = getTasks();
+  const t = tasks[key][idx];
+  const inp = document.getElementById(`edit-inp-${t.id}`);
+  const timeEl = document.getElementById(`edit-time-${t.id}`);
+  const prioEl = document.getElementById(`edit-prio-${t.id}`);
+  const text = inp.value.trim();
+  if (!text) { toast('Escribe un texto para la tarea', 'error'); return; }
+  t.text = text;
+  t.time = timeEl.value || '';
+  t.priority = prioEl.value || 'none';
+  saveTasks(tasks);
+  editingTaskId = null;
+  renderAgenda();
+  if (statsVisible()) renderStats();
+  toast('Tarea actualizada', 'success');
 }
 
 function addTask(key) {
@@ -2080,6 +2195,7 @@ function addTask(key) {
     createdAt: new Date().toISOString()
   });
   saveTasks(tasks);
+  if (openTaskFormKey === key) openTaskFormKey = null;
   renderAgenda();
   if (statsVisible()) renderStats();
   toast('Tarea añadida', 'success');
@@ -2438,7 +2554,7 @@ function startPomodoro() {
       savePomoHistory(hist);
       renderPomoHistory();
       toast('¡Sesión completada! Toma un descanso.', 'success');
-      if (Notification.permission==='granted') new Notification('Digital Minds — Pomodoro', { body:'¡Sesión completada! Toma un descanso.' });
+      if (Notification.permission==='granted') new Notification('Digital Minds', { body:'Sesión de enfoque completada. Toma un descanso.', icon: NOTIF_ICON_DATA_URL, tag: 'dm-pomodoro' });
       document.getElementById('pomo-sub').textContent = '¡Completado!';
     }
   }, 1000);
@@ -2501,10 +2617,29 @@ function renderPomoHistory() {
 /* ============================================================
    METAS / OKRs
 ============================================================ */
+let editingGoalIdx = null;
+
 function openGoalModal() {
+  editingGoalIdx = null;
+  document.getElementById('goal-modal-title').textContent = 'Nueva Meta / OKR';
+  document.getElementById('goal-modal-save-btn').textContent = 'Crear meta';
   document.getElementById('goal-title-input').value='';
   document.getElementById('goal-desc-input').value='';
   document.getElementById('goal-date-input').value='';
+  document.getElementById('goal-cat-input').value='personal';
+  document.getElementById('modal-goal').classList.add('open');
+}
+
+function openEditGoalModal(idx) {
+  const g = getGoals()[idx];
+  if (!g) return;
+  editingGoalIdx = idx;
+  document.getElementById('goal-modal-title').textContent = 'Editar Meta / OKR';
+  document.getElementById('goal-modal-save-btn').textContent = 'Guardar cambios';
+  document.getElementById('goal-title-input').value = g.title;
+  document.getElementById('goal-desc-input').value = g.desc || '';
+  document.getElementById('goal-date-input').value = g.deadline || '';
+  document.getElementById('goal-cat-input').value = g.category || 'personal';
   document.getElementById('modal-goal').classList.add('open');
 }
 
@@ -2512,19 +2647,24 @@ function saveGoal() {
   const title = document.getElementById('goal-title-input').value.trim();
   if (!title) { toast('Escribe un título para la meta','error'); return; }
   const goals = getGoals();
-  goals.push({
-    id: Date.now(),
-    title,
-    desc: document.getElementById('goal-desc-input').value.trim(),
-    deadline: document.getElementById('goal-date-input').value,
-    category: document.getElementById('goal-cat-input').value,
-    milestones: [],
-    createdAt: new Date().toISOString()
-  });
-  saveGoals(goals);
-  closeModal('modal-goal');
-  renderGoals();
-  toast('Meta creada', 'success');
+  const desc = document.getElementById('goal-desc-input').value.trim();
+  const deadline = document.getElementById('goal-date-input').value;
+  const category = document.getElementById('goal-cat-input').value;
+
+  if (editingGoalIdx !== null && goals[editingGoalIdx]) {
+    Object.assign(goals[editingGoalIdx], { title, desc, deadline, category });
+    saveGoals(goals);
+    closeModal('modal-goal');
+    renderGoals();
+    toast('Meta actualizada', 'success');
+  } else {
+    goals.push({ id: Date.now(), title, desc, deadline, category, milestones: [], createdAt: new Date().toISOString() });
+    saveGoals(goals);
+    closeModal('modal-goal');
+    renderGoals();
+    toast('Meta creada', 'success');
+  }
+  editingGoalIdx = null;
 }
 
 function renderGoals() {
@@ -2550,9 +2690,14 @@ function renderGoals() {
             </div>
             ${g.desc?`<div style="font-size:.82rem;color:var(--text2);margin-top:6px">${g.desc}</div>`:''}
           </div>
-          <button class="btn btn-danger" onclick="deleteGoal(${gi})" style="padding:6px 10px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          </button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" onclick="openEditGoalModal(${gi})" style="padding:6px 10px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+            <button class="btn btn-danger" onclick="deleteGoal(${gi})" style="padding:6px 10px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
         </div>
         <div class="goal-progress">
           <div class="goal-prog-top"><span>Progreso de hitos</span><span>${done}/${total} (${pct}%)</span></div>
@@ -2613,20 +2758,48 @@ function deleteMilestone(goalIdx, msIdx) {
 /* ============================================================
    PROYECTOS
 ============================================================ */
+let editingProjectIdx = null;
+
 function openProjectModal() {
+  editingProjectIdx = null;
+  document.getElementById('proj-modal-title').textContent = 'Nuevo Proyecto';
+  document.getElementById('proj-modal-save-btn').textContent = 'Crear proyecto';
   document.getElementById('proj-name-input').value='';
+  document.getElementById('proj-color-input').value='#7c6af7';
+  document.getElementById('modal-project').classList.add('open');
+}
+
+function openEditProjectModal(idx) {
+  const p = getProjects()[idx];
+  if (!p) return;
+  editingProjectIdx = idx;
+  document.getElementById('proj-modal-title').textContent = 'Editar Proyecto';
+  document.getElementById('proj-modal-save-btn').textContent = 'Guardar cambios';
+  document.getElementById('proj-name-input').value = p.name;
+  document.getElementById('proj-color-input').value = p.color;
   document.getElementById('modal-project').classList.add('open');
 }
 
 function saveProject() {
   const name = document.getElementById('proj-name-input').value.trim();
   if (!name) { toast('Escribe un nombre para el proyecto','error'); return; }
+  const color = document.getElementById('proj-color-input').value;
   const projects = getProjects();
-  projects.push({ id:Date.now(), name, color:document.getElementById('proj-color-input').value, tasks:[], createdAt:new Date().toISOString() });
-  saveProjects(projects);
-  closeModal('modal-project');
-  renderProjects();
-  toast('Proyecto creado', 'success');
+  if (editingProjectIdx !== null && projects[editingProjectIdx]) {
+    projects[editingProjectIdx].name = name;
+    projects[editingProjectIdx].color = color;
+    saveProjects(projects);
+    closeModal('modal-project');
+    renderProjects();
+    toast('Proyecto actualizado', 'success');
+  } else {
+    projects.push({ id:Date.now(), name, color, tasks:[], createdAt:new Date().toISOString() });
+    saveProjects(projects);
+    closeModal('modal-project');
+    renderProjects();
+    toast('Proyecto creado', 'success');
+  }
+  editingProjectIdx = null;
 }
 
 function renderProjects() {
@@ -2646,9 +2819,14 @@ function renderProjects() {
             <span class="project-tag" style="background:${p.color}22;color:${p.color}">${p.name}</span>
             <div style="font-size:.75rem;color:var(--text3);margin-top:4px">${done}/${total} completadas</div>
           </div>
-          <button class="btn btn-danger" onclick="deleteProject(${pi})" style="padding:6px 10px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          </button>
+          <div class="project-actions" style="display:flex;gap:6px">
+            <button class="btn btn-ghost" onclick="openEditProjectModal(${pi})" style="padding:6px 10px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+            <button class="btn btn-danger" onclick="deleteProject(${pi})" style="padding:6px 10px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
         </div>
         <div class="progress-bar-wrap" style="margin-bottom:12px">
           <div class="progress-bar" style="width:${total>0?Math.round((done/total)*100):0}%;background:${p.color}"></div>
@@ -2828,8 +3006,18 @@ function renderNotifs() {
         <div class="notif-desc">${n.desc}</div>
         <div class="notif-time">${new Date(n.time).toLocaleString('es',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
       </div>
+      <button class="notif-del" onclick="deleteNotif(${n.id})" title="Eliminar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
     </div>
   `).join('');
+}
+
+function deleteNotif(id) {
+  const notifs = getNotifs().filter(n => n.id !== id);
+  saveNotifs(notifs);
+  renderNotifs();
+  updateNotifBadge();
 }
 
 function markAllRead() {
@@ -2891,9 +3079,9 @@ function startNotifChecker() {
         t._notified = true;
         addNotif(t.text, `Hora programada: ${t.time}`);
         if (Notification.permission==='granted') {
-          new Notification('⏰ Digital Minds', {
+          new Notification('Digital Minds', {
             body: `${t.text} · ${t.time}`,
-            icon: 'icon.png',
+            icon: NOTIF_ICON_DATA_URL,
             tag: `dm-task-${todayKey}-${t.time}`
           });
         }
