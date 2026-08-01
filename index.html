@@ -589,74 +589,156 @@
     .goal-card {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 20px; margin-bottom: 14px;
+      position: relative; overflow: hidden; transition: var(--transition);
     }
-    .goal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-    .goal-title { font-size: 1rem; font-weight: 600; }
-    .goal-meta { font-size: .78rem; color: var(--text3); margin-top: 2px; }
+    .goal-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--goal-color, var(--accent));
+    }
+    .goal-card:hover { border-color: var(--bg4); box-shadow: 0 8px 24px rgba(0,0,0,.18); transform: translateY(-1px); }
+    .goal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    .goal-header-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+    .goal-cat-icon {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: grid; place-items: center;
+      background: color-mix(in srgb, var(--goal-color, var(--accent)) 16%, transparent);
+      color: var(--goal-color, var(--accent));
+    }
+    .goal-cat-icon svg { width: 18px; height: 18px; }
+    .goal-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
+    .goal-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .goal-cat-pill {
+      display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 99px;
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+      background: color-mix(in srgb, var(--goal-color, var(--accent)) 16%, transparent);
+      color: var(--goal-color, var(--accent));
+    }
+    .goal-deadline { display: inline-flex; align-items: center; gap: 4px; color: var(--text3); font-size: .75rem; }
+    .goal-deadline svg { width: 12px; height: 12px; }
+    .goal-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .goal-icon-btn {
+      width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text2); transition: var(--transition);
+    }
+    .goal-icon-btn svg { width: 14px; height: 14px; }
+    .goal-icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .goal-icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,.08); }
+    .goal-desc { font-size: .82rem; color: var(--text2); line-height: 1.5; margin-top: 8px; }
     .goal-progress { margin-bottom: 14px; }
-    .goal-prog-top { display: flex; justify-content: space-between; font-size: .8rem; color: var(--text2); margin-bottom: 6px; }
+    .goal-prog-top { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text2); margin-bottom: 6px; }
+    .goal-prog-top b { color: var(--text); }
+    .progress-bar { background: linear-gradient(90deg, var(--goal-color, var(--accent)), color-mix(in srgb, var(--goal-color, var(--accent)) 60%, white 0%)); }
     .milestones { display: flex; flex-direction: column; gap: 6px; }
     .milestone-item {
       display: flex; align-items: center; gap: 10px;
-      padding: 8px 12px; background: var(--bg3); border-radius: var(--radius-sm);
-      font-size: .85rem;
+      padding: 9px 12px; background: var(--bg3); border-radius: var(--radius-sm);
+      font-size: .85rem; transition: var(--transition);
     }
+    .milestone-item:hover { background: var(--bg4); }
     .milestone-check {
-      width: 16px; height: 16px; border-radius: 4px;
+      width: 18px; height: 18px; border-radius: 6px;
       border: 1.5px solid var(--border); flex-shrink: 0;
       cursor: pointer; display: grid; place-items: center;
       transition: var(--transition);
     }
+    .milestone-check svg { width: 11px; height: 11px; opacity: 0; transition: var(--transition); stroke: #fff; }
     .milestone-check.done { background: var(--success); border-color: var(--success); }
-    .milestone-check.done::after { content: '✓'; font-size: .6rem; color: #fff; }
+    .milestone-check.done svg { opacity: 1; }
+    .milestone-text { flex: 1; min-width: 0; word-break: break-word; }
+    .milestone-empty { font-size: .78rem; color: var(--text3); font-style: italic; padding: 6px 2px; }
     .milestone-del {
-      margin-left: auto; width: 20px; height: 20px;
+      margin-left: auto; width: 22px; height: 22px;
       display: grid; place-items: center; opacity: 0; transition: var(--transition);
+      border-radius: 6px; color: var(--text3);
     }
-    .milestone-del svg { width: 12px; height: 12px; stroke: var(--danger); }
+    .milestone-del svg { width: 12px; height: 12px; }
+    .milestone-del:hover { background: rgba(239,68,68,.15); color: var(--danger); }
     .milestone-item:hover .milestone-del { opacity: 1; }
-    .add-milestone-row { display: flex; gap: 8px; margin-top: 10px; }
+    .add-milestone-row { display: flex; gap: 8px; margin-top: 12px; }
     .add-milestone-row input {
-      flex: 1; padding: 7px 10px; border-radius: var(--radius-sm);
+      flex: 1; padding: 8px 11px; border-radius: var(--radius-sm);
       border: 1px solid var(--border); background: var(--bg3);
-      color: var(--text); font-size: .82rem; outline: none;
+      color: var(--text); font-size: .82rem; outline: none; transition: var(--transition);
     }
     .add-milestone-row input:focus { border-color: var(--accent); }
+    .add-milestone-row button {
+      width: 34px; height: 34px; border-radius: var(--radius-sm); flex-shrink: 0;
+      background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;
+      transition: var(--transition);
+    }
+    .add-milestone-row button:hover { background: var(--accent); color: #fff; }
+    .add-milestone-row button svg { width: 15px; height: 15px; }
 
     /* ===================== PROYECTOS ===================== */
     .project-card {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px;
+      border-radius: var(--radius); padding: 20px; transition: var(--transition);
+      position: relative; overflow: hidden;
     }
-    .project-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .project-tag {
-      display: inline-flex; align-items: center;
-      padding: 3px 10px; border-radius: 99px; font-size: .72rem; font-weight: 600;
+    .project-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--proj-color, var(--accent));
     }
-    .project-tasks { display: flex; flex-direction: column; gap: 7px; }
+    .project-card:hover { border-color: var(--bg4); box-shadow: 0 8px 24px rgba(0,0,0,.18); transform: translateY(-1px); }
+    .project-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+    .project-header-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .project-icon {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: grid; place-items: center;
+      background: color-mix(in srgb, var(--proj-color, var(--accent)) 16%, transparent);
+      color: var(--proj-color, var(--accent));
+    }
+    .project-icon svg { width: 18px; height: 18px; }
+    .project-name { font-size: .95rem; font-weight: 700; line-height: 1.3; word-break: break-word; }
+    .project-sub { font-size: .74rem; color: var(--text3); margin-top: 2px; }
+    .project-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .project-icon-btn {
+      width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--bg3); border: 1px solid var(--border); color: var(--text2); transition: var(--transition);
+    }
+    .project-icon-btn svg { width: 14px; height: 14px; }
+    .project-icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .project-icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,.08); }
+    .project-progress-wrap { margin-bottom: 14px; }
+    .project-progress-bar { background: linear-gradient(90deg, var(--proj-color, var(--accent)), color-mix(in srgb, var(--proj-color, var(--accent)) 60%, white 0%)); }
+    .project-tasks { display: flex; flex-direction: column; gap: 6px; }
     .proj-task {
       display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px; background: var(--bg3); border-radius: var(--radius-sm);
-      font-size: .85rem;
+      padding: 9px 10px; background: var(--bg3); border-radius: var(--radius-sm);
+      font-size: .85rem; transition: var(--transition);
     }
+    .proj-task:hover { background: var(--bg4); }
+    .proj-task-text { flex: 1; min-width: 0; word-break: break-word; }
     .proj-task-check {
-      width: 15px; height: 15px; border-radius: 4px;
+      width: 17px; height: 17px; border-radius: 5px;
       border: 1.5px solid var(--border); flex-shrink: 0;
       cursor: pointer; display: grid; place-items: center; transition: var(--transition);
     }
+    .proj-task-check svg { width: 10px; height: 10px; opacity: 0; transition: var(--transition); stroke: #fff; }
     .proj-task-check.done { background: var(--success); border-color: var(--success); }
-    .proj-task-check.done::after { content: '✓'; font-size: .6rem; color: #fff; }
-    .proj-task.done-proj span { text-decoration: line-through; color: var(--text3); }
-    .proj-task-del { margin-left: auto; width: 20px; height: 20px; display: grid; place-items: center; opacity: 0; transition: var(--transition); }
-    .proj-task-del svg { width: 12px; height: 12px; stroke: var(--danger); }
-    .proj-task:hover .proj-task-del { opacity: 1; }
-    .add-proj-task-row { display: flex; gap: 8px; margin-top: 10px; }
+    .proj-task-check.done svg { opacity: 1; }
+    .proj-task.done-proj .proj-task-text { text-decoration: line-through; color: var(--text3); }
+    .proj-task-actions { display: flex; gap: 2px; margin-left: auto; opacity: 0; transition: var(--transition); }
+    .proj-task:hover .proj-task-actions { opacity: 1; }
+    .proj-task-edit, .proj-task-del { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: var(--text3); }
+    .proj-task-edit svg, .proj-task-del svg { width: 12px; height: 12px; }
+    .proj-task-edit:hover { background: var(--accent-soft); color: var(--accent); }
+    .proj-task-del:hover { background: rgba(239,68,68,.15); color: var(--danger); }
+    .proj-task-empty { font-size: .78rem; color: var(--text3); font-style: italic; padding: 6px 2px; }
+    .add-proj-task-row { display: flex; gap: 8px; margin-top: 12px; }
     .add-proj-task-row input {
-      flex: 1; padding: 7px 10px; border-radius: var(--radius-sm);
+      flex: 1; padding: 8px 11px; border-radius: var(--radius-sm);
       border: 1px solid var(--border); background: var(--bg3);
-      color: var(--text); font-size: .82rem; outline: none;
+      color: var(--text); font-size: .82rem; outline: none; transition: var(--transition);
     }
     .add-proj-task-row input:focus { border-color: var(--accent); }
+    .add-proj-task-row button {
+      width: 34px; height: 34px; border-radius: var(--radius-sm); flex-shrink: 0;
+      background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;
+      transition: var(--transition);
+    }
+    .add-proj-task-row button:hover { background: var(--accent); color: #fff; }
+    .add-proj-task-row button svg { width: 15px; height: 15px; }
 
     /* ===================== NOTAS ===================== */
     .notes-wrap { display: grid; grid-template-columns: 240px 1fr; gap: 20px; }
@@ -2727,6 +2809,15 @@ function saveGoal() {
   editingGoalIdx = null;
 }
 
+const GOAL_CATEGORIES = {
+  personal: { color:'#7c6af7', label:'Personal', icon:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>' },
+  trabajo:  { color:'#3b82f6', label:'Trabajo', icon:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
+  estudio:  { color:'#22c55e', label:'Estudio', icon:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>' },
+  salud:    { color:'#ef4444', label:'Salud', icon:'<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>' },
+  finanzas: { color:'#f59e0b', label:'Finanzas', icon:'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
+  otro:     { color:'#9090a8', label:'Otro', icon:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' }
+};
+
 function renderGoals() {
   const goals = getGoals();
   const el = document.getElementById('goals-list');
@@ -2738,45 +2829,69 @@ function renderGoals() {
     const total = g.milestones.length;
     const done = g.milestones.filter(m=>m.done).length;
     const pct = total>0?Math.round((done/total)*100):0;
-    const catColors = { personal:'#7c6af7', trabajo:'#3b82f6', estudio:'#22c55e', salud:'#ef4444', finanzas:'#f59e0b', otro:'#9090a8' };
+    const cat = GOAL_CATEGORIES[g.category] || GOAL_CATEGORIES.otro;
     return `
-      <div class="goal-card">
+      <div class="goal-card" style="--goal-color:${cat.color}">
         <div class="goal-header">
-          <div>
-            <div class="goal-title">${g.title}</div>
-            <div class="goal-meta">
-              <span style="background:${catColors[g.category]||'#7c6af7'}22;color:${catColors[g.category]||'#7c6af7'};padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600">${g.category}</span>
-              ${g.deadline?`<span style="margin-left:8px;color:var(--text3);font-size:.75rem">📅 ${formatDate(g.deadline)}</span>`:''}
+          <div class="goal-header-main">
+            <div class="goal-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${cat.icon}</svg></div>
+            <div>
+              <div class="goal-title">${g.title}</div>
+              <div class="goal-meta">
+                <span class="goal-cat-pill">${cat.label}</span>
+                ${g.deadline?`<span class="goal-deadline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>${formatDate(g.deadline)}</span>`:''}
+              </div>
+              ${g.desc?`<div class="goal-desc">${g.desc}</div>`:''}
             </div>
-            ${g.desc?`<div style="font-size:.82rem;color:var(--text2);margin-top:6px">${g.desc}</div>`:''}
           </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost" onclick="openEditGoalModal(${gi})" style="padding:6px 10px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <div class="goal-actions">
+            <button class="goal-icon-btn" onclick="openEditGoalModal(${gi})" title="Editar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             </button>
-            <button class="btn btn-danger" onclick="deleteGoal(${gi})" style="padding:6px 10px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <button class="goal-icon-btn danger" onclick="deleteGoal(${gi})" title="Eliminar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             </button>
           </div>
         </div>
         <div class="goal-progress">
-          <div class="goal-prog-top"><span>Progreso de hitos</span><span>${done}/${total} (${pct}%)</span></div>
+          <div class="goal-prog-top"><span>Progreso de hitos</span><span><b>${done}/${total}</b> · ${pct}%</span></div>
           <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
         </div>
         <div class="milestones">
-          ${g.milestones.map((m,mi)=>`
+          ${total===0 ? `<div class="milestone-empty">Sin hitos todavía. Añade el primero abajo.</div>` : g.milestones.map((m,mi)=>{
+            const editKey = `${gi}_${mi}`;
+            if (editingMilestoneKey === editKey) {
+              return `
+                <div class="milestone-item" style="flex-direction:column;align-items:stretch;gap:8px">
+                  <input type="text" id="ms-edit-inp-${editKey}" value="${escapeAttr(m.text)}" class="account-input" style="padding:7px 9px"
+                         onkeydown="if(event.key==='Enter')saveMilestoneEdit(${gi},${mi}); if(event.key==='Escape')cancelMilestoneEdit();">
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-accent" style="flex:1;padding:6px" onclick="saveMilestoneEdit(${gi},${mi})">Guardar</button>
+                    <button class="btn btn-ghost" style="flex:1;padding:6px" onclick="cancelMilestoneEdit()">Cancelar</button>
+                  </div>
+                </div>
+              `;
+            }
+            return `
             <div class="milestone-item">
-              <div class="milestone-check${m.done?' done':''}" onclick="toggleMilestone(${gi},${mi})"></div>
-              <span style="${m.done?'text-decoration:line-through;color:var(--text3)':''}">${m.text}</span>
-              <button class="milestone-del" onclick="deleteMilestone(${gi},${mi})">
+              <div class="milestone-check${m.done?' done':''}" onclick="toggleMilestone(${gi},${mi})">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <span class="milestone-text" style="${m.done?'text-decoration:line-through;color:var(--text3)':''}">${m.text}</span>
+              <button class="milestone-del" onclick="editMilestone(${gi},${mi})" title="Editar hito" style="margin-left:auto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              </button>
+              <button class="milestone-del" onclick="deleteMilestone(${gi},${mi})" title="Eliminar hito">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-          `).join('')}
+          `;}).join('')}
         </div>
         <div class="add-milestone-row">
           <input type="text" id="ms-inp-${gi}" placeholder="Añadir hito…" onkeydown="if(event.key==='Enter')addMilestone(${gi})"/>
-          <button class="btn btn-ghost" onclick="addMilestone(${gi})" style="padding:6px 12px">+</button>
+          <button onclick="addMilestone(${gi})" title="Añadir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
         </div>
       </div>
     `;
@@ -2813,6 +2928,32 @@ function deleteMilestone(goalIdx, msIdx) {
   goals[goalIdx].milestones.splice(msIdx,1);
   saveGoals(goals);
   renderGoals();
+}
+
+let editingMilestoneKey = null;
+
+function editMilestone(goalIdx, msIdx) {
+  editingMilestoneKey = `${goalIdx}_${msIdx}`;
+  renderGoals();
+  setTimeout(() => { const el = document.getElementById(`ms-edit-inp-${editingMilestoneKey}`); if (el) { el.focus(); el.select(); } }, 0);
+}
+
+function cancelMilestoneEdit() {
+  editingMilestoneKey = null;
+  renderGoals();
+}
+
+function saveMilestoneEdit(goalIdx, msIdx) {
+  const editKey = `${goalIdx}_${msIdx}`;
+  const inp = document.getElementById(`ms-edit-inp-${editKey}`);
+  const text = inp.value.trim();
+  if (!text) { toast('Escribe un texto para el hito', 'error'); return; }
+  const goals = getGoals();
+  goals[goalIdx].milestones[msIdx].text = text;
+  saveGoals(goals);
+  editingMilestoneKey = null;
+  renderGoals();
+  toast('Hito actualizado', 'success');
 }
 
 /* ============================================================
@@ -2862,6 +3003,9 @@ function saveProject() {
   editingProjectIdx = null;
 }
 
+const PROJECT_ICON = '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>';
+let editingProjTaskKey = null;
+
 function renderProjects() {
   const projects = getProjects();
   const el = document.getElementById('projects-list');
@@ -2872,39 +3016,67 @@ function renderProjects() {
   el.innerHTML = projects.map((p,pi) => {
     const total = p.tasks.length;
     const done = p.tasks.filter(t=>t.done).length;
+    const pct = total>0?Math.round((done/total)*100):0;
     return `
-      <div class="project-card">
+      <div class="project-card" style="--proj-color:${p.color}">
         <div class="project-header">
-          <div>
-            <span class="project-tag" style="background:${p.color}22;color:${p.color}">${p.name}</span>
-            <div style="font-size:.75rem;color:var(--text3);margin-top:4px">${done}/${total} completadas</div>
+          <div class="project-header-main">
+            <div class="project-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${PROJECT_ICON}</svg></div>
+            <div>
+              <div class="project-name">${p.name}</div>
+              <div class="project-sub">${done}/${total} tareas completadas</div>
+            </div>
           </div>
-          <div class="project-actions" style="display:flex;gap:6px">
-            <button class="btn btn-ghost" onclick="openEditProjectModal(${pi})" style="padding:6px 10px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <div class="project-actions">
+            <button class="project-icon-btn" onclick="openEditProjectModal(${pi})" title="Editar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             </button>
-            <button class="btn btn-danger" onclick="deleteProject(${pi})" style="padding:6px 10px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <button class="project-icon-btn danger" onclick="deleteProject(${pi})" title="Eliminar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             </button>
           </div>
         </div>
-        <div class="progress-bar-wrap" style="margin-bottom:12px">
-          <div class="progress-bar" style="width:${total>0?Math.round((done/total)*100):0}%;background:${p.color}"></div>
+        <div class="project-progress-wrap">
+          <div class="progress-bar-wrap"><div class="progress-bar project-progress-bar" style="width:${pct}%"></div></div>
         </div>
         <div class="project-tasks">
-          ${p.tasks.map((t,ti)=>`
-            <div class="proj-task${t.done?' done-proj':''}">
-              <div class="proj-task-check${t.done?' done':''}" onclick="toggleProjTask(${pi},${ti})"></div>
-              <span>${t.text}</span>
-              <button class="proj-task-del" onclick="deleteProjTask(${pi},${ti})">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-          `).join('')}
+          ${total===0 ? `<div class="proj-task-empty">Sin tareas todavía. Añade la primera abajo.</div>` : p.tasks.map((t,ti)=>{
+            const editKey = `${pi}_${ti}`;
+            if (editingProjTaskKey === editKey) {
+              return `
+                <div class="proj-task" style="flex-direction:column;align-items:stretch;gap:8px">
+                  <input type="text" id="proj-edit-inp-${editKey}" value="${escapeAttr(t.text)}" class="account-input" style="padding:7px 9px"
+                         onkeydown="if(event.key==='Enter')saveProjTaskEdit(${pi},${ti}); if(event.key==='Escape')cancelProjTaskEdit();">
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-accent" style="flex:1;padding:6px" onclick="saveProjTaskEdit(${pi},${ti})">Guardar</button>
+                    <button class="btn btn-ghost" style="flex:1;padding:6px" onclick="cancelProjTaskEdit()">Cancelar</button>
+                  </div>
+                </div>
+              `;
+            }
+            return `
+              <div class="proj-task${t.done?' done-proj':''}">
+                <div class="proj-task-check${t.done?' done':''}" onclick="toggleProjTask(${pi},${ti})">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <span class="proj-task-text">${t.text}</span>
+                <div class="proj-task-actions">
+                  <button class="proj-task-edit" onclick="editProjTask(${pi},${ti})" title="Editar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                  </button>
+                  <button class="proj-task-del" onclick="deleteProjTask(${pi},${ti})" title="Eliminar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
         <div class="add-proj-task-row">
           <input type="text" id="pt-inp-${pi}" placeholder="Nueva tarea…" onkeydown="if(event.key==='Enter')addProjTask(${pi})"/>
-          <button class="btn btn-ghost" onclick="addProjTask(${pi})" style="padding:6px 12px">+</button>
+          <button onclick="addProjTask(${pi})" title="Añadir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
         </div>
       </div>
     `;
@@ -2941,6 +3113,30 @@ function deleteProjTask(projIdx, taskIdx) {
   projects[projIdx].tasks.splice(taskIdx,1);
   saveProjects(projects);
   renderProjects();
+}
+
+function editProjTask(projIdx, taskIdx) {
+  editingProjTaskKey = `${projIdx}_${taskIdx}`;
+  renderProjects();
+  setTimeout(() => { const el = document.getElementById(`proj-edit-inp-${editingProjTaskKey}`); if (el) { el.focus(); el.select(); } }, 0);
+}
+
+function cancelProjTaskEdit() {
+  editingProjTaskKey = null;
+  renderProjects();
+}
+
+function saveProjTaskEdit(projIdx, taskIdx) {
+  const editKey = `${projIdx}_${taskIdx}`;
+  const inp = document.getElementById(`proj-edit-inp-${editKey}`);
+  const text = inp.value.trim();
+  if (!text) { toast('Escribe un texto para la tarea', 'error'); return; }
+  const projects = getProjects();
+  projects[projIdx].tasks[taskIdx].text = text;
+  saveProjects(projects);
+  editingProjTaskKey = null;
+  renderProjects();
+  toast('Tarea actualizada', 'success');
 }
 
 /* ============================================================
