@@ -739,6 +739,14 @@
     .setting-row:last-child { border-bottom: none; }
     .setting-lbl { font-size: .875rem; }
     .setting-sub { font-size: .78rem; color: var(--text3); margin-top: 2px; }
+    .account-form-group { display: flex; flex-direction: column; gap: 8px; }
+    .account-form-row { display: flex; gap: 8px; margin-top: 6px; }
+    .account-input {
+      flex: 1; padding: 9px 12px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text); font-size: .85rem; outline: none; transition: var(--transition);
+    }
+    .account-input:focus { border-color: var(--accent); }
     .toggle {
       width: 40px; height: 22px; border-radius: 99px;
       background: var(--bg4); position: relative; cursor: pointer;
@@ -1369,6 +1377,26 @@
                 <div class="toggle" id="notif-toggle" onclick="toggleNotifications()"></div>
               </div>
             </div>
+            <div class="card">
+              <h3>Cuenta</h3>
+              <div class="account-form-group">
+                <div class="setting-lbl">Cambiar nombre de usuario</div>
+                <div class="setting-sub">Lo usarás para iniciar sesión de ahora en adelante</div>
+                <div class="account-form-row">
+                  <input type="text" id="new-username-input" class="account-input" placeholder="Nuevo usuario">
+                  <button class="btn btn-accent" onclick="changeUsername()">Guardar</button>
+                </div>
+              </div>
+              <div class="account-form-group" style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+                <div class="setting-lbl">Cambiar contraseña</div>
+                <div class="setting-sub">Mínimo 6 caracteres, sin otro requisito</div>
+                <div class="account-form-row" style="flex-direction:column">
+                  <input type="password" id="new-password-input" class="account-input" placeholder="Nueva contraseña">
+                  <input type="password" id="new-password-confirm-input" class="account-input" placeholder="Confirmar contraseña">
+                  <button class="btn btn-accent" onclick="changePassword()">Actualizar contraseña</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1771,6 +1799,38 @@ document.addEventListener('click', e => {
     closeProfileMenu();
   }
 });
+
+async function changeUsername() {
+  const input = document.getElementById('new-username-input');
+  const newU = input.value.trim();
+  if (!newU) { toast('Escribe un nuevo usuario', 'error'); return; }
+  if (newU.toLowerCase() === (currentUser||'').toLowerCase()) { toast('Ese ya es tu usuario actual', 'info'); return; }
+
+  const { error } = await sb.auth.updateUser({
+    email: usernameToEmail(newU),
+    data: { display_name: newU }
+  });
+  if (error) { toast('No se pudo cambiar el usuario: ' + authErrorMessage(error), 'error'); return; }
+
+  currentUser = newU;
+  document.getElementById('sidebar-username').textContent = newU;
+  document.getElementById('sidebar-avatar').textContent = newU[0].toUpperCase();
+  input.value = '';
+  toast('Usuario actualizado', 'success');
+}
+
+async function changePassword() {
+  const p1 = document.getElementById('new-password-input');
+  const p2 = document.getElementById('new-password-confirm-input');
+  if (p1.value.length < 6) { toast('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
+  if (p1.value !== p2.value) { toast('Las contraseñas no coinciden', 'error'); return; }
+
+  const { error } = await sb.auth.updateUser({ password: p1.value });
+  if (error) { toast('No se pudo cambiar la contraseña: ' + authErrorMessage(error), 'error'); return; }
+
+  p1.value = ''; p2.value = '';
+  toast('Contraseña actualizada', 'success');
+}
 
 async function deleteAccount() {
   if (!currentUID) return;
