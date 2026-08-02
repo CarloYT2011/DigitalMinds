@@ -1738,10 +1738,6 @@ function showAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
 }
 
-/* Firebase Auth exige un correo; usamos el "usuario" para armar uno interno,
-   asi la pantalla sigue pidiendo solo un nombre de usuario, no un email real.
-   Aqui se acepta cualquier texto como usuario (con espacios, acentos, etc.),
-   y por dentro se convierte a un formato valido para el correo interno. */
 function slugifyUsername(u) {
   const slug = u.trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos
@@ -1878,12 +1874,11 @@ async function handleSession(session) {
     navigate('resumen');
     appInitialized = true;
 
-    // Escucha cambios hechos desde otro dispositivo/sesion y refresca la vista
     realtimeChannel = sb.channel('app_data_' + currentUID)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `user_id=eq.${currentUID}` }, payload => {
         if (!payload.new) return;
         const incoming = mapDbRowToAppData(payload.new);
-        if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
+        if (JSON.stringify(incoming) === JSON.stringify(appData)) return;
         appData = incoming;
         loadSettings();
         renderAll();
@@ -1902,10 +1897,6 @@ async function handleSession(session) {
 }
 
 sb.auth.onAuthStateChange((_event, session) => {
-  // Supabase vuelve a disparar este evento (p. ej. SIGNED_IN) cada vez que
-  // regresas a la pestaña, aunque la sesión sea la misma de siempre. Si ya
-  // habíamos inicializado la app para este mismo usuario, ignoramos el
-  // evento para no reiniciar la vista ni mandarte de vuelta a "Resumen".
   if (appInitialized && session && session.user && currentUID === session.user.id) return;
   handleSession(session);
 });
@@ -2004,7 +1995,7 @@ async function deleteAccount() {
     await sb.auth.signOut();
     resetAuthForm();
   } catch (e) {
-    // Respaldo: si la funcion de servidor todavia no esta desplegada, al menos borra los datos
+    // Respaldo
     try {
       await sb.from('app_data').delete().eq('user_id', currentUID);
       await sb.auth.signOut();
@@ -2239,7 +2230,6 @@ function renderAgenda() {
       </div>
     `;
 
-    // Drag & Drop
     row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drag-over'); });
     row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
     row.addEventListener('drop', e => {
@@ -2252,7 +2242,6 @@ function renderAgenda() {
     grid.appendChild(row);
   }
 
-  // Bind drag events
   document.querySelectorAll('.task-item[draggable]').forEach(el => {
     el.addEventListener('dragstart', e => {
       el.classList.add('dragging');
@@ -2261,7 +2250,6 @@ function renderAgenda() {
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
   });
 
-  // Llevar la vista al dia de hoy si esta dentro de la semana visible
   if (todayRowEl) {
     setTimeout(() => {
       try { todayRowEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
@@ -2297,14 +2285,12 @@ function commitOrCloseAddForm(key) {
   const inp = document.getElementById(`inp-${key}`);
   if (!inp) { if (openTaskFormKey === key) openTaskFormKey = null; return; }
   if (inp.value.trim()) {
-    addTask(key); // ya guarda y cierra el formulario al re-renderizar
+    addTask(key);
   } else {
     closeAddForm(key);
   }
 }
 
-// Clic fuera del formulario de nueva tarea: guarda si ya se escribió algo, o lo cierra si estaba vacío.
-// No se activa al cambiar de pestaña del navegador, solo con clics reales dentro de la página.
 document.addEventListener('click', e => {
   if (!openTaskFormKey) return;
   const form = document.getElementById(`form-${openTaskFormKey}`);
@@ -2564,11 +2550,11 @@ function renderStats() {
     <div class="kpi-card"><div class="kpi-val">${rate}%</div><div class="kpi-lbl">Tasa de éxito</div></div>
   `;
 
-  // Chart: tareas por día esta semana
+  // Tareas por día esta semana
   drawWeekChart(tasks);
   drawDonutChart(done, total-done);
 
-  // Mejores días (fix: parsear la fecha como hora local, no UTC, para que el día de la semana sea correcto)
+  // Mejores días 
   const dayTotals = {};
   Object.entries(tasks).forEach(([k,arr]) => {
     const d = new Date(k+'T00:00:00');
@@ -2583,7 +2569,7 @@ function renderStats() {
     return `<div class="best-day-row"><span>${name}</span><span style="color:var(--accent);font-weight:600">${r}% (${dt.done}/${dt.total})</span></div>`;
   }).join('');
 
-  // Racha de los ultimos 14 dias, calculada a partir del calendario real (fecha de hoy hacia atras)
+  // Racha de los ultimos 14 dias
   const streakEl = document.getElementById('streak-row');
   const today = new Date();
   streakEl.innerHTML = '';
@@ -3608,7 +3594,6 @@ document.addEventListener('keydown', e => {
     }
   };
   if (map[e.key]) {
-    // Evita que 'n' o 'f' se escriban en el campo que se enfoca justo después
     if (e.key === 'n' || e.key === 'f') e.preventDefault();
     map[e.key]();
   }
@@ -3618,9 +3603,6 @@ function toggleShortcuts() {
   document.getElementById('shortcuts-panel').classList.toggle('open');
 }
 
-/* ============================================================
-   MODALES
-============================================================ */
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
@@ -3628,11 +3610,6 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
 });
 
-/* ============================================================
-   INIT
-============================================================ */
-/* La sesion ahora la maneja Firebase automaticamente via onAuthStateChanged
-   (definido mas arriba), que se dispara solo al cargar la pagina. */
 </script>
 </body>
 </html>
