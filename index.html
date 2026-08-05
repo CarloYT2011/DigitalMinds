@@ -7,6 +7,15 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="alternate icon" href="icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- ===================== PWA ===================== -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#7c6af7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Digital Minds">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     /* ===================== VARIABLES ===================== */
     :root {
@@ -470,6 +479,56 @@
       font-size: .75rem; font-weight: 600; transition: var(--transition);
     }
     .add-task-btn:hover { background: var(--accent); color: #fff; }
+
+    /* ===================== SELECTOR DE HORA (12h simple) ===================== */
+    .time-trigger {
+      display: flex; align-items: center; gap: 5px; cursor: pointer;
+      transition: var(--transition); white-space: nowrap;
+    }
+    .time-trigger:hover { border-color: var(--accent); }
+    .time-trigger svg { width: 12px; height: 12px; flex-shrink: 0; opacity: .7; }
+    .add-task-controls .time-trigger {
+      flex: 1; padding: 5px 7px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--bg2);
+      color: var(--text); font-size: .72rem;
+    }
+    .cal-add-row .time-trigger {
+      padding: 9px 12px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text); font-size: .85rem;
+    }
+    .time-popover {
+      position: fixed; z-index: 2000; display: none; flex-direction: column; gap: 10px;
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      box-shadow: var(--shadow); padding: 14px; width: 230px;
+    }
+    .time-popover.open { display: flex; }
+    .tp-row { display: flex; align-items: center; gap: 6px; }
+    .tp-row input.tp-num {
+      flex: 1; padding: 8px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--bg2); color: var(--text); font-size: .95rem; text-align: center; outline: none;
+      font-weight: 700; -moz-appearance: textfield;
+    }
+    .tp-row input.tp-num::-webkit-outer-spin-button,
+    .tp-row input.tp-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .tp-row input.tp-num:focus { border-color: var(--accent); }
+    .tp-sep { color: var(--text3); font-weight: 700; }
+    .tp-ampm { display: flex; gap: 4px; }
+    .tp-ampm-btn {
+      padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--bg2); color: var(--text2); font-size: .74rem; font-weight: 700;
+      transition: var(--transition);
+    }
+    .tp-ampm-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tp-actions { display: flex; gap: 6px; }
+    .tp-actions button {
+      flex: 1; padding: 7px; border-radius: 7px; font-size: .75rem; font-weight: 600;
+      transition: var(--transition);
+    }
+    .tp-clear { background: var(--bg2); color: var(--text2); }
+    .tp-clear:hover { background: var(--bg4); }
+    .tp-confirm { background: var(--accent); color: #fff; }
+    .tp-confirm:hover { opacity: .9; }
 
     /* ===================== CALENDARIO ===================== */
     .cal-wrap { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
@@ -1253,7 +1312,11 @@
               <h3 id="cal-detail-title">Selecciona una fecha</h3>
               <div class="cal-add-row" id="cal-add-row" style="display:none">
                 <input type="text" id="cal-task-input" placeholder="Nueva tarea para esta fecha…"/>
-                <input type="time" id="cal-task-time"/>
+                <button type="button" class="time-trigger" onclick="openTimePicker(this,'cal-task-time')">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                  <span class="tp-label">Hora</span>
+                </button>
+                <input type="hidden" id="cal-task-time"/>
                 <select id="cal-task-priority">
                   <option value="none">Sin prioridad</option>
                   <option value="low">Baja</option>
@@ -1738,6 +1801,10 @@ function showAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
 }
 
+/* Firebase Auth exige un correo; usamos el "usuario" para armar uno interno,
+   asi la pantalla sigue pidiendo solo un nombre de usuario, no un email real.
+   Aqui se acepta cualquier texto como usuario (con espacios, acentos, etc.),
+   y por dentro se convierte a un formato valido para el correo interno. */
 function slugifyUsername(u) {
   const slug = u.trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos
@@ -1874,11 +1941,12 @@ async function handleSession(session) {
     navigate('resumen');
     appInitialized = true;
 
+    // Escucha cambios hechos desde otro dispositivo/sesion y refresca la vista
     realtimeChannel = sb.channel('app_data_' + currentUID)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `user_id=eq.${currentUID}` }, payload => {
         if (!payload.new) return;
         const incoming = mapDbRowToAppData(payload.new);
-        if (JSON.stringify(incoming) === JSON.stringify(appData)) return;
+        if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
         appData = incoming;
         loadSettings();
         renderAll();
@@ -1897,6 +1965,10 @@ async function handleSession(session) {
 }
 
 sb.auth.onAuthStateChange((_event, session) => {
+  // Supabase vuelve a disparar este evento (p. ej. SIGNED_IN) cada vez que
+  // regresas a la pestaña, aunque la sesión sea la misma de siempre. Si ya
+  // habíamos inicializado la app para este mismo usuario, ignoramos el
+  // evento para no reiniciar la vista ni mandarte de vuelta a "Resumen".
   if (appInitialized && session && session.user && currentUID === session.user.id) return;
   handleSession(session);
 });
@@ -1995,7 +2067,7 @@ async function deleteAccount() {
     await sb.auth.signOut();
     resetAuthForm();
   } catch (e) {
-    // Respaldo
+    // Respaldo: si la funcion de servidor todavia no esta desplegada, al menos borra los datos
     try {
       await sb.from('app_data').delete().eq('user_id', currentUID);
       await sb.auth.signOut();
@@ -2214,7 +2286,7 @@ function renderAgenda() {
         <div class="add-task-row" id="form-${key}" style="display:none">
           <input class="add-task-input" id="inp-${key}" placeholder="Nueva tarea…" onkeydown="if(event.key==='Enter')addTask('${key}')"/>
           <div class="add-task-controls">
-            <input type="time" id="time-${key}"/>
+            ${buildTimeTriggerHTML(`time-${key}`, '')}
             <select id="prio-${key}">
               <option value="none">Sin prioridad</option>
               <option value="low">Baja</option>
@@ -2230,6 +2302,7 @@ function renderAgenda() {
       </div>
     `;
 
+    // Drag & Drop
     row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drag-over'); });
     row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
     row.addEventListener('drop', e => {
@@ -2242,6 +2315,7 @@ function renderAgenda() {
     grid.appendChild(row);
   }
 
+  // Bind drag events
   document.querySelectorAll('.task-item[draggable]').forEach(el => {
     el.addEventListener('dragstart', e => {
       el.classList.add('dragging');
@@ -2250,6 +2324,7 @@ function renderAgenda() {
     el.addEventListener('dragend', () => el.classList.remove('dragging'));
   });
 
+  // Llevar la vista al dia de hoy si esta dentro de la semana visible
   if (todayRowEl) {
     setTimeout(() => {
       try { todayRowEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
@@ -2277,6 +2352,7 @@ function closeAddForm(key) {
   trig.style.display = 'block';
   document.getElementById(`inp-${key}`).value = '';
   document.getElementById(`time-${key}`).value = '';
+  resetTimeTriggerLabel(`time-${key}`);
   document.getElementById(`prio-${key}`).value = 'none';
   if (openTaskFormKey === key) openTaskFormKey = null;
 }
@@ -2285,12 +2361,14 @@ function commitOrCloseAddForm(key) {
   const inp = document.getElementById(`inp-${key}`);
   if (!inp) { if (openTaskFormKey === key) openTaskFormKey = null; return; }
   if (inp.value.trim()) {
-    addTask(key);
+    addTask(key); // ya guarda y cierra el formulario al re-renderizar
   } else {
     closeAddForm(key);
   }
 }
 
+// Clic fuera del formulario de nueva tarea: guarda si ya se escribió algo, o lo cierra si estaba vacío.
+// No se activa al cambiar de pestaña del navegador, solo con clics reales dentro de la página.
 document.addEventListener('click', e => {
   if (!openTaskFormKey) return;
   const form = document.getElementById(`form-${openTaskFormKey}`);
@@ -2303,6 +2381,146 @@ function escapeAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+/* ===================== SELECTOR DE HORA (12h, menu simple con AM/PM) ===================== */
+let tpTargetInputId = null;
+let tpTargetBtnEl = null;
+let tpAmpm = 'AM';
+
+function formatTimeLabel(hhmm) {
+  if (!hhmm) return 'Hora';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = (h % 12) || 12;
+  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function buildTimeTriggerHTML(inputId, value) {
+  return `
+    <button type="button" class="time-trigger" onclick="openTimePicker(this,'${inputId}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      <span class="tp-label">${formatTimeLabel(value)}</span>
+    </button>
+    <input type="hidden" id="${inputId}" value="${value||''}">
+  `;
+}
+
+function resetTimeTriggerLabel(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const btn = input.previousElementSibling;
+  if (btn && btn.classList && btn.classList.contains('time-trigger')) {
+    const lbl = btn.querySelector('.tp-label');
+    if (lbl) lbl.textContent = formatTimeLabel(input.value);
+  }
+}
+
+function sanitizeTpHour(el) {
+  let digits = el.value.replace(/\D/g, '').slice(0, 2);
+  if (digits === '') { el.value = ''; return; }
+  let n = parseInt(digits, 10);
+  if (n > 12) {
+    if (n <= 23) {
+      n = n - 12;
+      if (n === 0) n = 12;
+      setTpAmpm('PM');
+    } else {
+      n = 12;
+    }
+  }
+  if (n === 0) n = 12;
+  el.value = String(n);
+}
+
+function sanitizeTpMinute(el) {
+  let digits = el.value.replace(/\D/g, '').slice(0, 2);
+  if (digits === '') { el.value = ''; return; }
+  let n = parseInt(digits, 10);
+  if (n > 59) n = 59;
+  el.value = String(n);
+}
+
+function setTpAmpm(val) {
+  tpAmpm = val;
+  document.querySelectorAll('.tp-ampm-btn').forEach(b => b.classList.toggle('active', b.dataset.val === val));
+}
+
+function openTimePicker(btnEl, inputId) {
+  tpTargetInputId = inputId;
+  tpTargetBtnEl = btnEl;
+
+  const input = document.getElementById(inputId);
+  const current = input ? input.value : '';
+  let h12 = 9, min = 0, ampm = 'AM';
+  if (current) {
+    const [h, m] = current.split(':').map(Number);
+    ampm = h >= 12 ? 'PM' : 'AM';
+    h12 = (h % 12) || 12;
+    min = m;
+  }
+  document.getElementById('tp-hour').value = String(h12).padStart(2,'0');
+  document.getElementById('tp-minute').value = String(min).padStart(2,'0');
+  setTpAmpm(ampm);
+
+  const pop = document.getElementById('time-popover');
+  pop.classList.add('open');
+
+  const rect = btnEl.getBoundingClientRect();
+  const popW = 230;
+  let left = rect.left;
+  if (left + popW > window.innerWidth - 10) left = window.innerWidth - popW - 10;
+  if (left < 10) left = 10;
+  let top = rect.bottom + 6;
+  if (top + 150 > window.innerHeight - 10) top = rect.top - 156;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+
+  setTimeout(() => document.addEventListener('click', onTpOutsideClick), 0);
+}
+
+function onTpOutsideClick(e) {
+  const pop = document.getElementById('time-popover');
+  if (pop.contains(e.target) || (tpTargetBtnEl && tpTargetBtnEl.contains(e.target))) return;
+  closeTimePicker();
+}
+
+function closeTimePicker() {
+  document.getElementById('time-popover').classList.remove('open');
+  document.removeEventListener('click', onTpOutsideClick);
+  tpTargetInputId = null;
+  tpTargetBtnEl = null;
+}
+
+function confirmTimePicker() {
+  if (!tpTargetInputId) return;
+  const hourVal = document.getElementById('tp-hour').value;
+  const minVal = document.getElementById('tp-minute').value;
+  let h12 = hourVal === '' ? 12 : parseInt(hourVal, 10);
+  let min = minVal === '' ? 0 : parseInt(minVal, 10);
+  if (h12 < 1 || h12 > 12) h12 = 12;
+  if (min < 0 || min > 59) min = 0;
+  let h24 = h12 % 12;
+  if (tpAmpm === 'PM') h24 += 12;
+  const hhmm = `${String(h24).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+  const input = document.getElementById(tpTargetInputId);
+  if (input) input.value = hhmm;
+  if (tpTargetBtnEl) {
+    const lbl = tpTargetBtnEl.querySelector('.tp-label');
+    if (lbl) lbl.textContent = formatTimeLabel(hhmm);
+  }
+  closeTimePicker();
+}
+
+function clearTimePicker() {
+  if (!tpTargetInputId) return;
+  const input = document.getElementById(tpTargetInputId);
+  if (input) input.value = '';
+  if (tpTargetBtnEl) {
+    const lbl = tpTargetBtnEl.querySelector('.tp-label');
+    if (lbl) lbl.textContent = formatTimeLabel('');
+  }
+  closeTimePicker();
+}
+
 let editingTaskId = null;
 
 function renderTaskItem(t, idx, key) {
@@ -2313,7 +2531,7 @@ function renderTaskItem(t, idx, key) {
         <input type="text" id="edit-inp-${t.id}" value="${escapeAttr(t.text)}"
                onkeydown="if(event.key==='Enter')saveTaskEdit('${key}',${idx}); if(event.key==='Escape')cancelTaskEdit();">
         <div class="add-task-controls">
-          <input type="time" id="edit-time-${t.id}" value="${t.time||''}">
+          ${buildTimeTriggerHTML(`edit-time-${t.id}`, t.time||'')}
           <select id="edit-prio-${t.id}">
             <option value="none" ${prio==='none'?'selected':''}>Sin prioridad</option>
             <option value="low" ${prio==='low'?'selected':''}>Baja</option>
@@ -2508,7 +2726,7 @@ function addCalTask() {
   if (!tasks[selectedCalDate]) tasks[selectedCalDate] = [];
   tasks[selectedCalDate].push({ id:Date.now(), text, done:false, time:timeEl.value||'', priority:prioEl.value||'none', createdAt:new Date().toISOString() });
   saveTasks(tasks);
-  inp.value=''; timeEl.value=''; prioEl.value='none';
+  inp.value=''; timeEl.value=''; resetTimeTriggerLabel('cal-task-time'); prioEl.value='none';
   renderCalDetail();
   renderCalendar();
   if (statsVisible()) renderStats();
@@ -2550,11 +2768,11 @@ function renderStats() {
     <div class="kpi-card"><div class="kpi-val">${rate}%</div><div class="kpi-lbl">Tasa de éxito</div></div>
   `;
 
-  // Tareas por día esta semana
+  // Chart: tareas por día esta semana
   drawWeekChart(tasks);
   drawDonutChart(done, total-done);
 
-  // Mejores días 
+  // Mejores días (fix: parsear la fecha como hora local, no UTC, para que el día de la semana sea correcto)
   const dayTotals = {};
   Object.entries(tasks).forEach(([k,arr]) => {
     const d = new Date(k+'T00:00:00');
@@ -2569,7 +2787,7 @@ function renderStats() {
     return `<div class="best-day-row"><span>${name}</span><span style="color:var(--accent);font-weight:600">${r}% (${dt.done}/${dt.total})</span></div>`;
   }).join('');
 
-  // Racha de los ultimos 14 dias
+  // Racha de los ultimos 14 dias, calculada a partir del calendario real (fecha de hoy hacia atras)
   const streakEl = document.getElementById('streak-row');
   const today = new Date();
   streakEl.innerHTML = '';
@@ -3594,6 +3812,7 @@ document.addEventListener('keydown', e => {
     }
   };
   if (map[e.key]) {
+    // Evita que 'n' o 'f' se escriban en el campo que se enfoca justo después
     if (e.key === 'n' || e.key === 'f') e.preventDefault();
     map[e.key]();
   }
@@ -3603,6 +3822,9 @@ function toggleShortcuts() {
   document.getElementById('shortcuts-panel').classList.toggle('open');
 }
 
+/* ============================================================
+   MODALES
+============================================================ */
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
@@ -3610,6 +3832,38 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); });
 });
 
+/* ============================================================
+   INIT
+============================================================ */
+/* La sesion ahora la maneja Firebase automaticamente via onAuthStateChanged
+   (definido mas arriba), que se dispara solo al cargar la pagina. */
+
+/* ============================================================
+   PWA - REGISTRO DEL SERVICE WORKER
+============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.error('Error registrando el service worker:', err);
+    });
+  });
+}
 </script>
+  <!-- Selector de hora (12h, menu simple con AM/PM) -->
+  <div class="time-popover" id="time-popover">
+    <div class="tp-row">
+      <input type="text" inputmode="numeric" maxlength="2" id="tp-hour" class="tp-num" placeholder="hh" oninput="sanitizeTpHour(this)">
+      <span class="tp-sep">:</span>
+      <input type="text" inputmode="numeric" maxlength="2" id="tp-minute" class="tp-num" placeholder="mm" oninput="sanitizeTpMinute(this)">
+      <div class="tp-ampm">
+        <button type="button" class="tp-ampm-btn" data-val="AM" onclick="setTpAmpm('AM')">AM</button>
+        <button type="button" class="tp-ampm-btn" data-val="PM" onclick="setTpAmpm('PM')">PM</button>
+      </div>
+    </div>
+    <div class="tp-actions">
+      <button type="button" class="tp-clear" onclick="clearTimePicker()">Sin hora</button>
+      <button type="button" class="tp-confirm" onclick="confirmTimePicker()">Listo</button>
+    </div>
+  </div>
 </body>
 </html>
