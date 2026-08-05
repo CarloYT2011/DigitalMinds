@@ -1949,6 +1949,10 @@ async function handleSession(session) {
         if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
         appData = incoming;
         loadSettings();
+        // Si el usuario está en medio de algo (escribiendo una tarea, eligiendo la hora, editando),
+        // no repintamos ahora mismo: se perdería lo que estaba haciendo y el panel "saltaría".
+        // Los datos ya quedaron actualizados por debajo; el repintado se aplica en cuanto termine.
+        if (isUserBusyEditing()) { pendingRemoteRender = true; return; }
         renderAll();
         const activeNav = document.querySelector('.nav-item.active');
         if (activeNav) navigate(activeNav.dataset.section);
@@ -2369,11 +2373,19 @@ function commitOrCloseAddForm(key) {
 
 // Clic fuera del formulario de nueva tarea: guarda si ya se escribió algo, o lo cierra si estaba vacío.
 // No se activa al cambiar de pestaña del navegador, solo con clics reales dentro de la página.
+// IMPORTANTE: el selector de hora (#time-popover) vive fuera del formulario en el DOM, así que
+// hay que tratarlo como si fuera parte del formulario. Si no, cada clic dentro del selector
+// (elegir hora, AM/PM, "Listo"...) se interpretaba como un "clic afuera" y guardaba la tarea
+// de golpe sin hora, cerrando/moviendo todo el panel de forma molesta.
 document.addEventListener('click', e => {
   if (!openTaskFormKey) return;
   const form = document.getElementById(`form-${openTaskFormKey}`);
   const trig = document.getElementById(`trig-${openTaskFormKey}`);
-  if (form && (form.contains(e.target) || (trig && trig.contains(e.target)))) return;
+  const timePop = document.getElementById('time-popover');
+  if (form && (form.contains(e.target) || (trig && trig.contains(e.target)) || (timePop && timePop.contains(e.target)))) return;
+  // Mientras el selector de hora esté abierto, no se guarda/cierra el formulario todavía:
+  // primero hay que terminar de elegir la hora.
+  if (timePop && timePop.classList.contains('open')) return;
   commitOrCloseAddForm(openTaskFormKey);
 });
 
@@ -2488,7 +2500,34 @@ function closeTimePicker() {
   document.removeEventListener('click', onTpOutsideClick);
   tpTargetInputId = null;
   tpTargetBtnEl = null;
+  flushPendingRemoteRender();
 }
+
+// ----- Evita que una actualización remota (otro dispositivo) interrumpa al usuario -----
+let pendingRemoteRender = false;
+
+function isUserBusyEditing() {
+  const timePop = document.getElementById('time-popover');
+  if (timePop && timePop.classList.contains('open')) return true;
+  if (openTaskFormKey) return true;
+  if (editingTaskId !== null) return true;
+  const active = document.activeElement;
+  if (active && ['INPUT','TEXTAREA','SELECT'].includes(active.tagName)) return true;
+  return false;
+}
+
+function flushPendingRemoteRender() {
+  if (!pendingRemoteRender || isUserBusyEditing()) return;
+  pendingRemoteRender = false;
+  renderAll();
+  const activeNav = document.querySelector('.nav-item.active');
+  if (activeNav) navigate(activeNav.dataset.section);
+}
+
+// Red de seguridad por si el usuario deja de estar "ocupado" sin pasar por closeTimePicker
+// (p. ej. cancela el formulario, hace click fuera de un select, etc.)
+document.addEventListener('focusout', () => setTimeout(flushPendingRemoteRender, 60));
+setInterval(flushPendingRemoteRender, 4000);
 
 function confirmTimePicker() {
   if (!tpTargetInputId) return;
@@ -3632,7 +3671,7 @@ function startNotifChecker() {
         addNotif(t.text, `Hora programada: ${t.time}`);
         if (Notification.permission==='granted') {
           new Notification('Digital Minds', {
-            body: `${t.text} · ${t.time}`,
+            body: `Recordatorio de tarea\n${t.text}\n¡Es hora! · ${t.time}`,
             icon: NOTIF_ICON_DATA_URL,
             tag: `dm-task-${todayKey}-${t.time}`
           });
