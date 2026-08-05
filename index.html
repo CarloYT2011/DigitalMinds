@@ -497,20 +497,12 @@
       border: 1px solid var(--border); background: var(--bg3);
       color: var(--text); font-size: .85rem;
     }
-    /* El selector de hora es un modal centrado en vez de un popover "pegado" al botón:
-       así no depende de recalcular su posición según el botón, el scroll o el teclado
-       del celular, que es lo que hacía que se moviera / se sintiera inestable. */
     .time-popover {
-      position: fixed; inset: 0; z-index: 2000; display: none;
-      align-items: center; justify-content: center; padding: 20px;
-      background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
+      position: fixed; z-index: 2000; display: none; flex-direction: column; gap: 10px;
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      box-shadow: var(--shadow); padding: 14px; width: 230px;
     }
     .time-popover.open { display: flex; }
-    .time-popover-box {
-      display: flex; flex-direction: column; gap: 10px;
-      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm);
-      box-shadow: var(--shadow); padding: 16px; width: 100%; max-width: 230px;
-    }
     .tp-row { display: flex; align-items: center; gap: 6px; }
     .tp-row input.tp-num {
       flex: 1; padding: 8px; border-radius: 7px; border: 1px solid var(--border);
@@ -1904,18 +1896,10 @@ async function loadUserData(uid) {
   return mapDbRowToAppData(data);
 }
 
-// Guarda el "updated_at" que nosotros mismos escribimos, para poder reconocer
-// y descartar el "eco" de nuestro propio guardado cuando vuelve por tiempo real
-// (si no, ese eco podía pisar cambios locales recién hechos -p.ej. marcar una
-// tarea como ya notificada- y revertirlos, causando notificaciones repetidas
-// o "fantasma" de tareas que ya se habían avisado).
-let lastLocalSaveAt = null;
-
 function scheduleCloudSave() {
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     if (!currentUID) return;
-    const updatedAt = new Date().toISOString();
     const { error } = await sb.from('app_data').upsert({
       user_id: currentUID,
       tasks: appData.tasks,
@@ -1925,13 +1909,11 @@ function scheduleCloudSave() {
       notifs: appData.notifs,
       pomo_history: appData.pomoHistory,
       settings: appData.settings,
-      updated_at: updatedAt
+      updated_at: new Date().toISOString()
     });
     if (error) {
       console.error('Error guardando en la nube:', error);
       toast('No se pudo guardar en la nube, revisa tu conexión', 'error');
-    } else {
-      lastLocalSaveAt = updatedAt;
     }
   }, 500);
 }
@@ -1963,10 +1945,6 @@ async function handleSession(session) {
     realtimeChannel = sb.channel('app_data_' + currentUID)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `user_id=eq.${currentUID}` }, payload => {
         if (!payload.new) return;
-        // Si esto es el eco de nuestro propio guardado (mismo updated_at que acabamos
-        // de escribir), lo ignoramos: nuestro estado local ya es correcto y aplicar
-        // este eco podía revertir cambios hechos justo después de guardar.
-        if (lastLocalSaveAt && payload.new.updated_at === lastLocalSaveAt) return;
         const incoming = mapDbRowToAppData(payload.new);
         if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
         appData = incoming;
@@ -2391,19 +2369,11 @@ function commitOrCloseAddForm(key) {
 
 // Clic fuera del formulario de nueva tarea: guarda si ya se escribió algo, o lo cierra si estaba vacío.
 // No se activa al cambiar de pestaña del navegador, solo con clics reales dentro de la página.
-// IMPORTANTE: el selector de hora (#time-popover) vive fuera del formulario en el DOM, así que
-// hay que tratarlo como si fuera parte del formulario. Si no, cada clic dentro del selector
-// (elegir hora, AM/PM, "Listo"...) se interpretaba como un "clic afuera" y guardaba la tarea
-// de golpe sin hora, cerrando/moviendo todo el panel de forma molesta.
 document.addEventListener('click', e => {
   if (!openTaskFormKey) return;
   const form = document.getElementById(`form-${openTaskFormKey}`);
   const trig = document.getElementById(`trig-${openTaskFormKey}`);
-  const timePop = document.getElementById('time-popover');
-  if (form && (form.contains(e.target) || (trig && trig.contains(e.target)) || (timePop && timePop.contains(e.target)))) return;
-  // Mientras el selector de hora esté abierto, no se guarda/cierra el formulario todavía:
-  // primero hay que terminar de elegir la hora.
-  if (timePop && timePop.classList.contains('open')) return;
+  if (form && (form.contains(e.target) || (trig && trig.contains(e.target)))) return;
   commitOrCloseAddForm(openTaskFormKey);
 });
 
@@ -2474,11 +2444,6 @@ function setTpAmpm(val) {
   document.querySelectorAll('.tp-ampm-btn').forEach(b => b.classList.toggle('active', b.dataset.val === val));
 }
 
-// El selector es ahora un modal centrado (con fondo oscuro), no un popover anclado al botón,
-// así que no hace falta calcular ninguna posición: se queda quieto pase lo que pase
-// (scroll, teclado del celular, re-render, etc).
-let timePopoverBackdropBound = false;
-
 function openTimePicker(btnEl, inputId) {
   tpTargetInputId = inputId;
   tpTargetBtnEl = btnEl;
@@ -2499,17 +2464,28 @@ function openTimePicker(btnEl, inputId) {
   const pop = document.getElementById('time-popover');
   pop.classList.add('open');
 
-  // Un click en el fondo oscuro (fuera de la cajita) cierra el selector.
-  // El contenido interno (.time-popover-box) detiene la propagación del click,
-  // así que esto solo se dispara si de verdad se clickeó afuera.
-  if (!timePopoverBackdropBound) {
-    pop.addEventListener('click', () => closeTimePicker());
-    timePopoverBackdropBound = true;
-  }
+  const rect = btnEl.getBoundingClientRect();
+  const popW = 230;
+  let left = rect.left;
+  if (left + popW > window.innerWidth - 10) left = window.innerWidth - popW - 10;
+  if (left < 10) left = 10;
+  let top = rect.bottom + 6;
+  if (top + 150 > window.innerHeight - 10) top = rect.top - 156;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+
+  setTimeout(() => document.addEventListener('click', onTpOutsideClick), 0);
+}
+
+function onTpOutsideClick(e) {
+  const pop = document.getElementById('time-popover');
+  if (pop.contains(e.target) || (tpTargetBtnEl && tpTargetBtnEl.contains(e.target))) return;
+  closeTimePicker();
 }
 
 function closeTimePicker() {
   document.getElementById('time-popover').classList.remove('open');
+  document.removeEventListener('click', onTpOutsideClick);
   tpTargetInputId = null;
   tpTargetBtnEl = null;
 }
@@ -3656,7 +3632,7 @@ function startNotifChecker() {
         addNotif(t.text, `Hora programada: ${t.time}`);
         if (Notification.permission==='granted') {
           new Notification('Digital Minds', {
-            body: `Recordatorio de tarea\n${t.text}\n¡Es hora! · ${t.time}`,
+            body: `${t.text} · ${t.time}`,
             icon: NOTIF_ICON_DATA_URL,
             tag: `dm-task-${todayKey}-${t.time}`
           });
@@ -3875,20 +3851,18 @@ if ('serviceWorker' in navigator) {
 </script>
   <!-- Selector de hora (12h, menu simple con AM/PM) -->
   <div class="time-popover" id="time-popover">
-    <div class="time-popover-box" onclick="event.stopPropagation()">
-      <div class="tp-row">
-        <input type="text" inputmode="numeric" maxlength="2" id="tp-hour" class="tp-num" placeholder="hh" oninput="sanitizeTpHour(this)">
-        <span class="tp-sep">:</span>
-        <input type="text" inputmode="numeric" maxlength="2" id="tp-minute" class="tp-num" placeholder="mm" oninput="sanitizeTpMinute(this)">
-        <div class="tp-ampm">
-          <button type="button" class="tp-ampm-btn" data-val="AM" onclick="setTpAmpm('AM')">AM</button>
-          <button type="button" class="tp-ampm-btn" data-val="PM" onclick="setTpAmpm('PM')">PM</button>
-        </div>
+    <div class="tp-row">
+      <input type="text" inputmode="numeric" maxlength="2" id="tp-hour" class="tp-num" placeholder="hh" oninput="sanitizeTpHour(this)">
+      <span class="tp-sep">:</span>
+      <input type="text" inputmode="numeric" maxlength="2" id="tp-minute" class="tp-num" placeholder="mm" oninput="sanitizeTpMinute(this)">
+      <div class="tp-ampm">
+        <button type="button" class="tp-ampm-btn" data-val="AM" onclick="setTpAmpm('AM')">AM</button>
+        <button type="button" class="tp-ampm-btn" data-val="PM" onclick="setTpAmpm('PM')">PM</button>
       </div>
-      <div class="tp-actions">
-        <button type="button" class="tp-clear" onclick="clearTimePicker()">Sin hora</button>
-        <button type="button" class="tp-confirm" onclick="confirmTimePicker()">Listo</button>
-      </div>
+    </div>
+    <div class="tp-actions">
+      <button type="button" class="tp-clear" onclick="clearTimePicker()">Sin hora</button>
+      <button type="button" class="tp-confirm" onclick="confirmTimePicker()">Listo</button>
     </div>
   </div>
 </body>
