@@ -1949,10 +1949,6 @@ async function handleSession(session) {
         if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
         appData = incoming;
         loadSettings();
-        // Si el usuario está en medio de algo (escribiendo una tarea, eligiendo la hora, editando),
-        // no repintamos ahora mismo: se perdería lo que estaba haciendo y el panel "saltaría".
-        // Los datos ya quedaron actualizados por debajo; el repintado se aplica en cuanto termine.
-        if (isUserBusyEditing()) { pendingRemoteRender = true; return; }
         renderAll();
         const activeNav = document.querySelector('.nav-item.active');
         if (activeNav) navigate(activeNav.dataset.section);
@@ -2500,34 +2496,7 @@ function closeTimePicker() {
   document.removeEventListener('click', onTpOutsideClick);
   tpTargetInputId = null;
   tpTargetBtnEl = null;
-  flushPendingRemoteRender();
 }
-
-// ----- Evita que una actualización remota (otro dispositivo) interrumpa al usuario -----
-let pendingRemoteRender = false;
-
-function isUserBusyEditing() {
-  const timePop = document.getElementById('time-popover');
-  if (timePop && timePop.classList.contains('open')) return true;
-  if (openTaskFormKey) return true;
-  if (editingTaskId !== null) return true;
-  const active = document.activeElement;
-  if (active && ['INPUT','TEXTAREA','SELECT'].includes(active.tagName)) return true;
-  return false;
-}
-
-function flushPendingRemoteRender() {
-  if (!pendingRemoteRender || isUserBusyEditing()) return;
-  pendingRemoteRender = false;
-  renderAll();
-  const activeNav = document.querySelector('.nav-item.active');
-  if (activeNav) navigate(activeNav.dataset.section);
-}
-
-// Red de seguridad por si el usuario deja de estar "ocupado" sin pasar por closeTimePicker
-// (p. ej. cancela el formulario, hace click fuera de un select, etc.)
-document.addEventListener('focusout', () => setTimeout(flushPendingRemoteRender, 60));
-setInterval(flushPendingRemoteRender, 4000);
 
 function confirmTimePicker() {
   if (!tpTargetInputId) return;
