@@ -3598,7 +3598,7 @@ async function deleteNote(id) {
    ASISTENTE IA (Gemini)
 ============================================================ */
 const GEMINI_API_KEY = "AQ.Ab8RN6K2LM0sXu-Pm_anulkrIAcsoPQWa-DWtuheave0EM4JXA";
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
