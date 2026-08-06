@@ -532,6 +532,39 @@
     .tp-confirm { background: var(--accent); color: #fff; }
     .tp-confirm:hover { opacity: .9; }
 
+    /* ===================== ASISTENTE IA ===================== */
+    .ai-chat-card {
+      display: flex; flex-direction: column;
+      height: calc(100vh - 220px); min-height: 380px;
+      padding: 16px;
+    }
+    .ai-chat-messages {
+      flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 4px 4px 12px;
+    }
+    .ai-msg {
+      max-width: 78%; padding: 10px 14px; border-radius: 14px;
+      font-size: .875rem; line-height: 1.55; word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .ai-msg-user {
+      align-self: flex-end; background: var(--accent); color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .ai-msg-bot {
+      align-self: flex-start; background: var(--bg3); color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .ai-msg-bot.thinking { color: var(--text3); font-style: italic; }
+    .ai-chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
+    .ai-chat-input-row input {
+      flex: 1; padding: 12px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text); font-size: .875rem; outline: none; transition: var(--transition);
+    }
+    .ai-chat-input-row input:focus { border-color: var(--accent); }
+
     /* ===================== CALENDARIO ===================== */
     .cal-wrap { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
     .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
@@ -1172,6 +1205,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>Notas</span>
         </button>
+        <button class="nav-item" data-section="asistente" onclick="navigate('asistente')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Asistente IA</span>
+        </button>
       </div>
 
       <div class="nav-group">
@@ -1470,6 +1507,29 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 <p>Selecciona o crea una nota</p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== ASISTENTE IA ===== -->
+        <section class="page-section" id="section-asistente">
+          <div class="section-head">
+            <div><h2>Asistente IA</h2><div class="sub">Conoce tus tareas, metas y proyectos — pídele sugerencias u organiza tu semana</div></div>
+            <div class="section-actions">
+              <button class="btn btn-ghost" onclick="clearAIChat()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                Limpiar conversación
+              </button>
+            </div>
+          </div>
+          <div class="card ai-chat-card">
+            <div class="ai-chat-messages" id="ai-chat-messages"></div>
+            <div class="ai-chat-input-row">
+              <input type="text" id="ai-chat-input" placeholder="Pregúntale algo, pídele sugerencias u organiza tu semana…" onkeydown="if(event.key==='Enter')sendAIChatMessage()"/>
+              <button class="btn btn-accent" onclick="sendAIChatMessage()" id="ai-chat-send-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Enviar
+              </button>
             </div>
           </div>
         </section>
@@ -2108,8 +2168,8 @@ function savePomoHistory(h) { appData.pomoHistory = h; scheduleCloudSave(); }
 const sectionTitles = {
   resumen:'Resumen', agenda:'Agenda semanal', calendario:'Calendario',
   estadisticas:'Estadísticas', pomodoro:'Pomodoro', metas:'Metas / OKRs',
-  proyectos:'Proyectos', notas:'Notas rápidas', notificaciones:'Notificaciones',
-  personalizacion:'Personalización', cuenta:'Cuenta'
+  proyectos:'Proyectos', notas:'Notas rápidas', asistente:'Asistente IA',
+  notificaciones:'Notificaciones', personalizacion:'Personalización', cuenta:'Cuenta'
 };
 
 function navigate(sec) {
@@ -2126,6 +2186,7 @@ function navigate(sec) {
   if (sec==='metas') renderGoals();
   if (sec==='proyectos') renderProjects();
   if (sec==='notas') renderNotes();
+  if (sec==='asistente') renderAIChat();
   if (sec==='notificaciones') renderNotifs();
   if (sec==='pomodoro') renderPomoTaskSel();
 
@@ -3531,6 +3592,114 @@ async function deleteNote(id) {
   saveNotes(notes);
   activeNoteId = notes[0]?.id || null;
   renderNotes();
+}
+
+/* ============================================================
+   ASISTENTE IA (Gemini)
+============================================================ */
+const GEMINI_API_KEY = "AQ.Ab8RN6K2LM0sXu-Pm_anulkrIAcsoPQWa-DWtuheave0EM4JXA";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+let aiChatHistory = []; // [{role:'user'|'model', text}]
+
+function buildAIContext() {
+  const tasks = getTasks();
+  const today = getToday();
+  const pending = [];
+  Object.keys(tasks).sort().forEach(date => {
+    (tasks[date]||[]).forEach(t => {
+      if (!t.done) {
+        pending.push(`${date}${t.time?' '+t.time:''} — ${t.text}${t.priority&&t.priority!=='none'?' [prioridad '+t.priority+']':''}`);
+      }
+    });
+  });
+
+  const goals = getGoals().map(g => {
+    const done = g.milestones.filter(m=>m.done).length;
+    return `${g.title}${g.deadline?' (vence '+g.deadline+')':''} — ${done}/${g.milestones.length} hitos completados`;
+  });
+
+  const projects = getProjects().map(p => {
+    const done = p.tasks.filter(t=>t.done).length;
+    return `${p.name} — ${done}/${p.tasks.length} tareas completadas`;
+  });
+
+  const notesTitles = getNotes().map(n => n.title || 'Sin título').slice(0, 25);
+
+  return `Hoy es: ${today}
+Usuario: ${currentUser}
+
+TAREAS PENDIENTES (todas las fechas, ordenadas):
+${pending.length ? pending.join('\n') : '(sin tareas pendientes)'}
+
+METAS / OKRs:
+${goals.length ? goals.join('\n') : '(sin metas registradas)'}
+
+PROYECTOS:
+${projects.length ? projects.join('\n') : '(sin proyectos)'}
+
+TÍTULOS DE NOTAS GUARDADAS:
+${notesTitles.length ? notesTitles.join(', ') : '(sin notas)'}`;
+}
+
+function renderAIChat() {
+  const el = document.getElementById('ai-chat-messages');
+  if (!el) return;
+  if (!aiChatHistory.length) {
+    el.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><p>Pregúntale algo a tu asistente — ya conoce tus tareas, metas y proyectos</p></div>`;
+    return;
+  }
+  el.innerHTML = aiChatHistory.map(m => `
+    <div class="ai-msg ${m.role==='user'?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${escapeAttr(m.text).replace(/\n/g,'<br>')}</div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendAIChatMessage() {
+  const inp = document.getElementById('ai-chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+
+  aiChatHistory.push({ role:'user', text });
+  aiChatHistory.push({ role:'model', text:'Pensando…', thinking:true });
+  renderAIChat();
+
+  const btn = document.getElementById('ai-chat-send-btn');
+  btn.disabled = true;
+
+  try {
+    const systemInstruction = `Eres el asistente de productividad integrado en la app "Digital Minds". Ayudas a ${currentUser} a organizar sus tareas, le das sugerencias concretas y accionables, y le recuerdas pendientes cuando pregunte. Responde siempre en español, de forma breve, cálida y directa, sin relleno innecesario. Este es el estado actual de su cuenta:\n\n${buildAIContext()}`;
+
+    const contents = aiChatHistory
+      .filter(m => !m.thinking)
+      .map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+
+    const res = await fetch(GEMINI_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemInstruction }] },
+        contents
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || 'Error de la API de Gemini');
+    const reply = (data.candidates && data.candidates[0] && data.candidates[0].content &&
+                   data.candidates[0].content.parts.map(p=>p.text).join('')) || 'No obtuve respuesta, intenta de nuevo.';
+    aiChatHistory[aiChatHistory.length-1] = { role:'model', text: reply };
+  } catch (e) {
+    aiChatHistory[aiChatHistory.length-1] = { role:'model', text: 'No se pudo conectar con el asistente: ' + (e.message || 'intenta de nuevo') };
+  }
+
+  btn.disabled = false;
+  renderAIChat();
+}
+
+function clearAIChat() {
+  aiChatHistory = [];
+  renderAIChat();
 }
 
 /* ============================================================
