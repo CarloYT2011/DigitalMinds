@@ -58,13 +58,14 @@
 
     /* ===================== RESET ===================== */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: var(--font-size); }
+    html { font-size: var(--font-size); overflow-x: hidden; }
     body {
       font-family: var(--font-family);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       overflow-x: hidden;
+      width: 100%;
     }
     button { font-family: inherit; cursor: pointer; border: none; background: none; }
     input, textarea, select { font-family: inherit; }
@@ -418,7 +419,8 @@
     .task-item.done .task-check { background: var(--success); border-color: var(--success); }
     .task-item.done .task-check::after { content: '✓'; font-size: .6rem; font-weight: 700; color: #fff; }
     .task-item.done .task-txt { text-decoration: line-through; color: var(--text3); }
-    .task-txt { flex: 1; line-height: 1.4; word-break: break-word; }
+    .task-txt { flex: 1; min-width: 0; line-height: 1.4; word-break: break-word; }
+    .task-text-span { flex: 1; min-width: 0; word-break: break-word; }
     .task-time {
       font-size: .68rem; font-weight: 700; color: var(--accent); white-space: nowrap;
       background: var(--accent-soft); padding: 2px 8px; border-radius: 99px;
@@ -557,6 +559,15 @@
       border-bottom-left-radius: 4px;
     }
     .ai-msg-bot.thinking { color: var(--text3); font-style: italic; }
+    .ai-msg-row { display: flex; align-items: flex-end; gap: 8px; }
+    .ai-msg-row.user { flex-direction: row-reverse; }
+    .ai-avatar {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: grid; place-items: center; font-size: .72rem; font-weight: 700;
+    }
+    .ai-avatar.bot { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-soft); }
+    .ai-avatar.bot svg { width: 15px; height: 15px; }
+    .ai-avatar.user { background: var(--bg4); color: var(--text2); }
     .ai-chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
     .ai-chat-input-row input {
       flex: 1; padding: 12px 14px; border-radius: var(--radius-sm);
@@ -3595,13 +3606,313 @@ async function deleteNote(id) {
 }
 
 /* ============================================================
-   ASISTENTE IA (Gemini)
+   ASISTENTE IA (Gemini, con capacidad real de modificar tareas)
 ============================================================ */
 const GEMINI_API_KEY = "AQ.Ab8RN6K2LM0sXu-Pm_anulkrIAcsoPQWa-DWtuheave0EM4JXA";
 const GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
+
+/* ---- Herramientas reales que el modelo puede invocar ---- */
+const AI_TOOLS = {
+  crear_tarea({ fecha, texto, hora, prioridad }) {
+    if (!fecha || !texto) return { ok:false, mensaje:'Faltan datos (fecha o texto) para crear la tarea.' };
+    const tasks = getTasks();
+    if (!tasks[fecha]) tasks[fecha] = [];
+    tasks[fecha].push({
+      id: Date.now() + Math.floor(Math.random()*1000),
+      text: texto, done:false, time: hora||'', priority: prioridad||'none',
+      createdAt: new Date().toISOString()
+    });
+    saveTasks(tasks);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea "${texto}" creada para ${fecha}${hora?' a las '+hora:''}.` };
+  },
+  completar_tarea({ fecha, texto }) {
+    const tasks = getTasks();
+    const list = tasks[fecha]||[];
+    const idx = list.findIndex(t => t.text.toLowerCase().includes((texto||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una tarea con "${texto}" el ${fecha}.` };
+    list[idx].done = true;
+    saveTasks(tasks);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea "${list[idx].text}" marcada como completada.` };
+  },
+  eliminar_tarea({ fecha, texto }) {
+    const tasks = getTasks();
+    const list = tasks[fecha]||[];
+    const idx = list.findIndex(t => t.text.toLowerCase().includes((texto||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una tarea con "${texto}" el ${fecha}.` };
+    const [removed] = list.splice(idx,1);
+    saveTasks(tasks);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea "${removed.text}" eliminada.` };
+  },
+  editar_tarea({ fecha, texto_actual, nuevo_texto, nueva_hora, nueva_prioridad }) {
+    const tasks = getTasks();
+    const list = tasks[fecha]||[];
+    const idx = list.findIndex(t => t.text.toLowerCase().includes((texto_actual||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una tarea con "${texto_actual}" el ${fecha}.` };
+    if (nuevo_texto) list[idx].text = nuevo_texto;
+    if (nueva_hora !== undefined && nueva_hora !== null) list[idx].time = nueva_hora;
+    if (nueva_prioridad) list[idx].priority = nueva_prioridad;
+    saveTasks(tasks);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea actualizada: "${list[idx].text}".` };
+  },
+
+  crear_nota({ titulo, contenido }) {
+    const notes = getNotes();
+    const note = { id:Date.now(), title: titulo||'Nueva nota', body: contenido||'', createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+    notes.unshift(note);
+    saveNotes(notes);
+    activeNoteId = note.id;
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Nota "${note.title}" creada.` };
+  },
+  editar_nota({ titulo_actual, nuevo_titulo, nuevo_contenido }) {
+    const notes = getNotes();
+    const idx = notes.findIndex(n => (n.title||'').toLowerCase().includes((titulo_actual||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una nota con título "${titulo_actual}".` };
+    if (nuevo_titulo) notes[idx].title = nuevo_titulo;
+    if (nuevo_contenido !== undefined) notes[idx].body = nuevo_contenido;
+    notes[idx].updatedAt = new Date().toISOString();
+    saveNotes(notes);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Nota actualizada: "${notes[idx].title}".` };
+  },
+  eliminar_nota({ titulo }) {
+    const notes = getNotes();
+    const idx = notes.findIndex(n => (n.title||'').toLowerCase().includes((titulo||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una nota con título "${titulo}".` };
+    const [removed] = notes.splice(idx,1);
+    saveNotes(notes);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Nota "${removed.title}" eliminada.` };
+  },
+
+  crear_meta({ titulo, descripcion, fecha_limite, categoria }) {
+    const goals = getGoals();
+    const cats = ['personal','trabajo','estudio','salud','finanzas','otro'];
+    const goal = { id:Date.now(), title: titulo, desc: descripcion||'', deadline: fecha_limite||'', category: cats.includes(categoria)?categoria:'personal', milestones:[], createdAt:new Date().toISOString() };
+    goals.push(goal);
+    saveGoals(goals);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Meta "${titulo}" creada.` };
+  },
+  agregar_hito({ meta_titulo, hito_texto }) {
+    const goals = getGoals();
+    const idx = goals.findIndex(g => g.title.toLowerCase().includes((meta_titulo||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una meta con título "${meta_titulo}".` };
+    goals[idx].milestones.push({ text: hito_texto, done:false });
+    saveGoals(goals);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Hito "${hito_texto}" agregado a "${goals[idx].title}".` };
+  },
+  completar_hito({ meta_titulo, hito_texto }) {
+    const goals = getGoals();
+    const gIdx = goals.findIndex(g => g.title.toLowerCase().includes((meta_titulo||'').toLowerCase()));
+    if (gIdx<0) return { ok:false, mensaje:`No encontré una meta con título "${meta_titulo}".` };
+    const mIdx = goals[gIdx].milestones.findIndex(m => m.text.toLowerCase().includes((hito_texto||'').toLowerCase()));
+    if (mIdx<0) return { ok:false, mensaje:`No encontré el hito "${hito_texto}" en "${goals[gIdx].title}".` };
+    goals[gIdx].milestones[mIdx].done = true;
+    saveGoals(goals);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Hito "${goals[gIdx].milestones[mIdx].text}" marcado como completado.` };
+  },
+  eliminar_meta({ titulo }) {
+    const goals = getGoals();
+    const idx = goals.findIndex(g => g.title.toLowerCase().includes((titulo||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré una meta con título "${titulo}".` };
+    const [removed] = goals.splice(idx,1);
+    saveGoals(goals);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Meta "${removed.title}" eliminada.` };
+  },
+
+  crear_proyecto({ nombre, color }) {
+    const projects = getProjects();
+    const palette = ['#7c6af7','#3b82f6','#22c55e','#f59e0b','#ef4444'];
+    const proj = { id:Date.now(), name: nombre, color: palette.includes(color)?color:'#7c6af7', tasks:[], createdAt:new Date().toISOString() };
+    projects.push(proj);
+    saveProjects(projects);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Proyecto "${nombre}" creado.` };
+  },
+  agregar_tarea_proyecto({ proyecto_nombre, texto }) {
+    const projects = getProjects();
+    const idx = projects.findIndex(p => p.name.toLowerCase().includes((proyecto_nombre||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré un proyecto llamado "${proyecto_nombre}".` };
+    projects[idx].tasks.push({ id:Date.now(), text: texto, done:false });
+    saveProjects(projects);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea "${texto}" agregada al proyecto "${projects[idx].name}".` };
+  },
+  completar_tarea_proyecto({ proyecto_nombre, texto }) {
+    const projects = getProjects();
+    const pIdx = projects.findIndex(p => p.name.toLowerCase().includes((proyecto_nombre||'').toLowerCase()));
+    if (pIdx<0) return { ok:false, mensaje:`No encontré un proyecto llamado "${proyecto_nombre}".` };
+    const tIdx = projects[pIdx].tasks.findIndex(t => t.text.toLowerCase().includes((texto||'').toLowerCase()));
+    if (tIdx<0) return { ok:false, mensaje:`No encontré la tarea "${texto}" en "${projects[pIdx].name}".` };
+    projects[pIdx].tasks[tIdx].done = true;
+    saveProjects(projects);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Tarea "${projects[pIdx].tasks[tIdx].text}" del proyecto "${projects[pIdx].name}" completada.` };
+  },
+  eliminar_proyecto({ nombre }) {
+    const projects = getProjects();
+    const idx = projects.findIndex(p => p.name.toLowerCase().includes((nombre||'').toLowerCase()));
+    if (idx<0) return { ok:false, mensaje:`No encontré un proyecto llamado "${nombre}".` };
+    const [removed] = projects.splice(idx,1);
+    saveProjects(projects);
+    refreshAfterAIChange();
+    return { ok:true, mensaje:`Proyecto "${removed.name}" eliminado.` };
+  }
+};
+
+const GEMINI_TOOLS = [{
+  function_declarations: [
+    {
+      name: "crear_tarea",
+      description: "Crea una nueva tarea en una fecha del calendario del usuario.",
+      parameters: { type:"OBJECT", properties: {
+        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"STRING", description:"Descripción de la tarea" },
+        hora: { type:"STRING", description:"Hora en formato 24h HH:MM, opcional" },
+        prioridad: { type:"STRING", enum:["none","low","medium","high"], description:"Prioridad, opcional" }
+      }, required:["fecha","texto"] }
+    },
+    {
+      name: "completar_tarea",
+      description: "Marca como completada una tarea existente, buscándola por texto en una fecha.",
+      parameters: { type:"OBJECT", properties: {
+        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"STRING", description:"Texto o parte del texto de la tarea" }
+      }, required:["fecha","texto"] }
+    },
+    {
+      name: "eliminar_tarea",
+      description: "Elimina una tarea existente, buscándola por texto en una fecha.",
+      parameters: { type:"OBJECT", properties: {
+        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"STRING", description:"Texto o parte del texto de la tarea" }
+      }, required:["fecha","texto"] }
+    },
+    {
+      name: "editar_tarea",
+      description: "Edita el texto, hora o prioridad de una tarea existente.",
+      parameters: { type:"OBJECT", properties: {
+        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
+        texto_actual: { type:"STRING", description:"Texto actual (o parte) de la tarea a editar" },
+        nuevo_texto: { type:"STRING", description:"Nuevo texto, opcional" },
+        nueva_hora: { type:"STRING", description:"Nueva hora 24h HH:MM, opcional" },
+        nueva_prioridad: { type:"STRING", enum:["none","low","medium","high"], description:"Nueva prioridad, opcional" }
+      }, required:["fecha","texto_actual"] }
+    },
+    {
+      name: "crear_nota",
+      description: "Crea una nota rápida nueva.",
+      parameters: { type:"OBJECT", properties: {
+        titulo: { type:"STRING", description:"Título de la nota" },
+        contenido: { type:"STRING", description:"Contenido de la nota, opcional" }
+      }, required:["titulo"] }
+    },
+    {
+      name: "editar_nota",
+      description: "Edita el título o contenido de una nota existente, buscándola por título.",
+      parameters: { type:"OBJECT", properties: {
+        titulo_actual: { type:"STRING", description:"Título actual (o parte) de la nota" },
+        nuevo_titulo: { type:"STRING", description:"Nuevo título, opcional" },
+        nuevo_contenido: { type:"STRING", description:"Nuevo contenido, opcional" }
+      }, required:["titulo_actual"] }
+    },
+    {
+      name: "eliminar_nota",
+      description: "Elimina una nota, buscándola por título.",
+      parameters: { type:"OBJECT", properties: {
+        titulo: { type:"STRING", description:"Título (o parte) de la nota a eliminar" }
+      }, required:["titulo"] }
+    },
+    {
+      name: "crear_meta",
+      description: "Crea una nueva meta / OKR.",
+      parameters: { type:"OBJECT", properties: {
+        titulo: { type:"STRING", description:"Título de la meta" },
+        descripcion: { type:"STRING", description:"Descripción, opcional" },
+        fecha_limite: { type:"STRING", description:"Fecha límite YYYY-MM-DD, opcional" },
+        categoria: { type:"STRING", enum:["personal","trabajo","estudio","salud","finanzas","otro"], description:"Categoría, opcional" }
+      }, required:["titulo"] }
+    },
+    {
+      name: "agregar_hito",
+      description: "Agrega un hito (milestone) a una meta existente, buscándola por título.",
+      parameters: { type:"OBJECT", properties: {
+        meta_titulo: { type:"STRING", description:"Título (o parte) de la meta" },
+        hito_texto: { type:"STRING", description:"Texto del nuevo hito" }
+      }, required:["meta_titulo","hito_texto"] }
+    },
+    {
+      name: "completar_hito",
+      description: "Marca como completado un hito de una meta, buscando meta y hito por texto.",
+      parameters: { type:"OBJECT", properties: {
+        meta_titulo: { type:"STRING", description:"Título (o parte) de la meta" },
+        hito_texto: { type:"STRING", description:"Texto (o parte) del hito a completar" }
+      }, required:["meta_titulo","hito_texto"] }
+    },
+    {
+      name: "eliminar_meta",
+      description: "Elimina una meta completa, buscándola por título.",
+      parameters: { type:"OBJECT", properties: {
+        titulo: { type:"STRING", description:"Título (o parte) de la meta a eliminar" }
+      }, required:["titulo"] }
+    },
+    {
+      name: "crear_proyecto",
+      description: "Crea un proyecto nuevo.",
+      parameters: { type:"OBJECT", properties: {
+        nombre: { type:"STRING", description:"Nombre del proyecto" },
+        color: { type:"STRING", enum:["#7c6af7","#3b82f6","#22c55e","#f59e0b","#ef4444"], description:"Color, opcional" }
+      }, required:["nombre"] }
+    },
+    {
+      name: "agregar_tarea_proyecto",
+      description: "Agrega una tarea a un proyecto existente, buscándolo por nombre.",
+      parameters: { type:"OBJECT", properties: {
+        proyecto_nombre: { type:"STRING", description:"Nombre (o parte) del proyecto" },
+        texto: { type:"STRING", description:"Texto de la nueva tarea" }
+      }, required:["proyecto_nombre","texto"] }
+    },
+    {
+      name: "completar_tarea_proyecto",
+      description: "Marca como completada una tarea dentro de un proyecto.",
+      parameters: { type:"OBJECT", properties: {
+        proyecto_nombre: { type:"STRING", description:"Nombre (o parte) del proyecto" },
+        texto: { type:"STRING", description:"Texto (o parte) de la tarea a completar" }
+      }, required:["proyecto_nombre","texto"] }
+    },
+    {
+      name: "eliminar_proyecto",
+      description: "Elimina un proyecto completo, buscándolo por nombre.",
+      parameters: { type:"OBJECT", properties: {
+        nombre: { type:"STRING", description:"Nombre (o parte) del proyecto a eliminar" }
+      }, required:["nombre"] }
+    }
+  ]
+}];
+
+function refreshAfterAIChange() {
+  renderResumen();
+  updateNotifBadge();
+  const activeSection = document.querySelector('.nav-item.active')?.dataset.section;
+  if (activeSection === 'agenda') renderAgenda();
+  if (activeSection === 'calendario') { renderCalendar(); if (selectedCalDate) renderCalDetail(); }
+  if (activeSection === 'pomodoro') renderPomoTaskSel();
+  if (activeSection === 'metas') renderGoals();
+  if (activeSection === 'proyectos') renderProjects();
+  if (activeSection === 'notas') renderNotes();
+  if (statsVisible()) renderStats();
+}
 
 function buildAIContext() {
   const tasks = getTasks();
@@ -3630,7 +3941,7 @@ function buildAIContext() {
   return `Hoy es: ${today}
 Usuario: ${currentUser}
 
-TAREAS PENDIENTES (todas las fechas, ordenadas):
+TAREAS PENDIENTES (todas las fechas):
 ${pending.length ? pending.join('\n') : '(sin tareas pendientes)'}
 
 METAS / OKRs:
@@ -3647,12 +3958,22 @@ function renderAIChat() {
   const el = document.getElementById('ai-chat-messages');
   if (!el) return;
   if (!aiChatHistory.length) {
-    el.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><p>Pregúntale algo a tu asistente — ya conoce tus tareas, metas y proyectos</p></div>`;
+    el.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a4 4 0 0 1 4 4v1h.5A2.5 2.5 0 0 1 19 9.5v6a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 15.5v-6A2.5 2.5 0 0 1 7.5 7H8V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M9 17h6"/></svg><p>Pregúntale algo o pídele que cree, complete o edite una tarea por ti</p></div>`;
     return;
   }
-  el.innerHTML = aiChatHistory.map(m => `
-    <div class="ai-msg ${m.role==='user'?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${escapeAttr(m.text).replace(/\n/g,'<br>')}</div>
-  `).join('');
+  const userInitial = (currentUser||'?')[0].toUpperCase();
+  el.innerHTML = aiChatHistory.map(m => {
+    const isUser = m.role === 'user';
+    const avatar = isUser
+      ? `<div class="ai-avatar user">${userInitial}</div>`
+      : `<div class="ai-avatar bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h.5A2.5 2.5 0 0 1 19 9.5v6a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 15.5v-6A2.5 2.5 0 0 1 7.5 7H8V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M9 17h6"/></svg></div>`;
+    return `
+      <div class="ai-msg-row${isUser?' user':''}">
+        ${avatar}
+        <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${escapeAttr(m.text).replace(/\n/g,'<br>')}</div>
+      </div>
+    `;
+  }).join('');
   el.scrollTop = el.scrollHeight;
 }
 
@@ -3670,25 +3991,61 @@ async function sendAIChatMessage() {
   btn.disabled = true;
 
   try {
-    const systemInstruction = `Eres el asistente de productividad integrado en la app "Digital Minds". Ayudas a ${currentUser} a organizar sus tareas, le das sugerencias concretas y accionables, y le recuerdas pendientes cuando pregunte. Responde siempre en español, de forma breve, cálida y directa, sin relleno innecesario. Este es el estado actual de su cuenta:\n\n${buildAIContext()}`;
+    const systemInstruction = `Eres el asistente de "Digital Minds", una app de tareas. Ayudas a ${currentUser}.
 
-    const contents = aiChatHistory
-      .filter(m => !m.thinking)
-      .map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+REGLAS:
+- Responde en español, MUY breve y directo (2-4 líneas normalmente). Sin relleno, sin repetir lo que el usuario ya dijo.
+- Tienes funciones reales para crear, completar, editar y eliminar tareas, notas, metas (con sus hitos) y proyectos (con sus tareas). Cuando el usuario pida una de esas acciones, LLAMA a la función correspondiente — nunca digas que hiciste algo sin haber llamado a la función.
+- Si el usuario no da fecha, usa la de hoy. Si no da hora o prioridad, créala sin hora / sin prioridad.
+- Después de ejecutar una función, confirma en una frase corta lo que realmente pasó (usa el resultado que te devuelve la función, no inventes detalles).
+- Si algo falla o falta información clave, pregunta solo lo estrictamente necesario, en una línea.
+- Sé siempre útil y propositivo: si detectas que algo se puede organizar mejor, sugiérelo brevemente.
 
-    const res = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message || 'Error de la API de Gemini');
-    const reply = (data.candidates && data.candidates[0] && data.candidates[0].content &&
-                   data.candidates[0].content.parts.map(p=>p.text).join('')) || 'No obtuve respuesta, intenta de nuevo.';
-    aiChatHistory[aiChatHistory.length-1] = { role:'model', text: reply };
+Estado actual de la cuenta:
+${buildAIContext()}`;
+
+    let contents = aiChatHistory.filter(m=>!m.thinking).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.text }]
+    }));
+
+    let finalText = null;
+    for (let i=0; i<5 && finalText===null; i++) {
+      const res = await fetch(GEMINI_ENDPOINT, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemInstruction }] },
+          tools: GEMINI_TOOLS,
+          contents
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || 'Error de la API de Gemini');
+
+      const candidate = data.candidates && data.candidates[0];
+      const parts = (candidate && candidate.content && candidate.content.parts) || [];
+      const functionCalls = parts.filter(p => p.functionCall);
+
+      if (functionCalls.length) {
+        contents.push({ role:'model', parts });
+        const responseParts = functionCalls.map(fc => {
+          const fn = AI_TOOLS[fc.functionCall.name];
+          let result;
+          try {
+            result = fn ? fn(fc.functionCall.args||{}) : { ok:false, mensaje:'Función no reconocida.' };
+          } catch (e) {
+            result = { ok:false, mensaje:'Error ejecutando la acción: ' + e.message };
+          }
+          return { functionResponse: { name: fc.functionCall.name, response: result } };
+        });
+        contents.push({ role:'function', parts: responseParts });
+      } else {
+        finalText = parts.map(p=>p.text||'').join('') || 'Listo.';
+      }
+    }
+    if (finalText === null) finalText = 'Hecho.';
+    aiChatHistory[aiChatHistory.length-1] = { role:'model', text: finalText };
   } catch (e) {
     aiChatHistory[aiChatHistory.length-1] = { role:'model', text: 'No se pudo conectar con el asistente: ' + (e.message || 'intenta de nuevo') };
   }
@@ -3873,10 +4230,27 @@ function exportData() {
     pomoHistory: getPomoHistory()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const filename = `digital-minds-backup-${getToday()}.json`;
+
+  // Puente nativo (app Android empaquetada): si existe, delega la
+  // descarga al sistema de archivos de Android via Storage Access Framework.
+  if (window.AndroidDownloadBridge) {
+    window.AndroidDownloadBridge.saveTextFile(filename, JSON.stringify(data, null, 2));
+    URL.revokeObjectURL(url);
+    toast('Backup exportado correctamente', 'success');
+    return;
+  }
+
+  // Navegador normal (web/PWA): el enlace debe existir en el documento
+  // para que el clic programado dispare la descarga de forma confiable.
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `digital-minds-backup-${getToday()}.json`;
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
   toast('Backup exportado correctamente', 'success');
 }
 
