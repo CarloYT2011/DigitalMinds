@@ -1969,10 +1969,16 @@ async function loadUserData(uid) {
   return mapDbRowToAppData(data);
 }
 
+let suppressRealtimeUntil = 0;
+
 function scheduleCloudSave() {
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     if (!currentUID) return;
+    // Al momento justo de guardar, ignoramos por un rato los "ecos" que la
+    // suscripción en tiempo real reciba de vuelta de este mismo guardado,
+    // para que no lleguen tarde con datos viejos y reviertan el cambio.
+    suppressRealtimeUntil = Date.now() + 4000;
     const { error } = await sb.from('app_data').upsert({
       user_id: currentUID,
       tasks: appData.tasks,
@@ -2018,6 +2024,10 @@ async function handleSession(session) {
     realtimeChannel = sb.channel('app_data_' + currentUID)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `user_id=eq.${currentUID}` }, payload => {
         if (!payload.new) return;
+        // Si acabamos de guardar algo desde este mismo dispositivo hace un
+        // instante, ignoramos este eco para que no revierta el cambio local
+        // con una versión que todavía no reflejaba lo que acabamos de hacer.
+        if (Date.now() < suppressRealtimeUntil) return;
         const incoming = mapDbRowToAppData(payload.new);
         if (JSON.stringify(incoming) === JSON.stringify(appData)) return; // sin cambios reales, no re-renderizar
         appData = incoming;
@@ -3613,6 +3623,7 @@ const GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
+let aiChatBusy = false;
 
 /* ---- Herramientas reales que el modelo puede invocar ---- */
 const AI_TOOLS = {
@@ -3954,6 +3965,21 @@ TÍTULOS DE NOTAS GUARDADAS:
 ${notesTitles.length ? notesTitles.join(', ') : '(sin notas)'}`;
 }
 
+function formatAIText(text) {
+  let out = escapeAttr(text);
+  // Listas: líneas que empiezan con "* " o "- " se convierten en viñetas
+  out = out.replace(/^[ \t]*[\*\-] (.+)$/gm, '• $1');
+  // Negrita: **texto** o __texto__
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  // Cursiva: *texto* o _texto_ (después de negrita, para no chocar con **)
+  out = out.replace(/(?<!\*)\*([^\*\n]+)\*(?!\*)/g, '<em>$1</em>');
+  out = out.replace(/(?<!_)_([^_\n]+)_(?!_)/g, '<em>$1</em>');
+  // Saltos de línea
+  out = out.replace(/\n/g, '<br>');
+  return out;
+}
+
 function renderAIChat() {
   const el = document.getElementById('ai-chat-messages');
   if (!el) return;
@@ -3970,7 +3996,7 @@ function renderAIChat() {
     return `
       <div class="ai-msg-row${isUser?' user':''}">
         ${avatar}
-        <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${escapeAttr(m.text).replace(/\n/g,'<br>')}</div>
+        <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${formatAIText(m.text)}</div>
       </div>
     `;
   }).join('');
@@ -3978,10 +4004,12 @@ function renderAIChat() {
 }
 
 async function sendAIChatMessage() {
+  if (aiChatBusy) return;
   const inp = document.getElementById('ai-chat-input');
   const text = inp.value.trim();
   if (!text) return;
   inp.value = '';
+  aiChatBusy = true;
 
   aiChatHistory.push({ role:'user', text });
   aiChatHistory.push({ role:'model', text:'Pensando…', thinking:true });
@@ -4051,6 +4079,7 @@ ${buildAIContext()}`;
   }
 
   btn.disabled = false;
+  aiChatBusy = false;
   renderAIChat();
 }
 
