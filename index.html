@@ -3618,9 +3618,9 @@ async function deleteNote(id) {
 /* ============================================================
    ASISTENTE IA (Gemini, con capacidad real de modificar tareas)
 ============================================================ */
-const GEMINI_API_KEY = "AQ.Ab8RN6K2LM0sXu-Pm_anulkrIAcsoPQWa-DWtuheave0EM4JXA";
-const GEMINI_MODEL = "gemini-flash-latest";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = "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";
+const GROQ_MODEL = "openai/gpt-oss-20b";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
 let aiChatBusy = false;
@@ -3782,135 +3782,178 @@ const AI_TOOLS = {
   }
 };
 
-const GEMINI_TOOLS = [{
-  function_declarations: [
-    {
+const GROQ_TOOLS = [
+  {
+    type: "function",
+    function: {
       name: "crear_tarea",
       description: "Crea una nueva tarea en una fecha del calendario del usuario.",
-      parameters: { type:"OBJECT", properties: {
-        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
-        texto: { type:"STRING", description:"Descripción de la tarea" },
-        hora: { type:"STRING", description:"Hora en formato 24h HH:MM, opcional" },
-        prioridad: { type:"STRING", enum:["none","low","medium","high"], description:"Prioridad, opcional" }
+      parameters: { type:"object", properties: {
+        fecha: { type:"string", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"string", description:"Descripción de la tarea" },
+        hora: { type:"string", description:"Hora en formato 24h HH:MM, opcional" },
+        prioridad: { type:"string", enum:["none","low","medium","high"], description:"Prioridad, opcional" }
       }, required:["fecha","texto"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "completar_tarea",
       description: "Marca como completada una tarea existente, buscándola por texto en una fecha.",
-      parameters: { type:"OBJECT", properties: {
-        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
-        texto: { type:"STRING", description:"Texto o parte del texto de la tarea" }
+      parameters: { type:"object", properties: {
+        fecha: { type:"string", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"string", description:"Texto o parte del texto de la tarea" }
       }, required:["fecha","texto"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "eliminar_tarea",
       description: "Elimina una tarea existente, buscándola por texto en una fecha.",
-      parameters: { type:"OBJECT", properties: {
-        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
-        texto: { type:"STRING", description:"Texto o parte del texto de la tarea" }
+      parameters: { type:"object", properties: {
+        fecha: { type:"string", description:"Fecha en formato YYYY-MM-DD" },
+        texto: { type:"string", description:"Texto o parte del texto de la tarea" }
       }, required:["fecha","texto"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "editar_tarea",
       description: "Edita el texto, hora o prioridad de una tarea existente.",
-      parameters: { type:"OBJECT", properties: {
-        fecha: { type:"STRING", description:"Fecha en formato YYYY-MM-DD" },
-        texto_actual: { type:"STRING", description:"Texto actual (o parte) de la tarea a editar" },
-        nuevo_texto: { type:"STRING", description:"Nuevo texto, opcional" },
-        nueva_hora: { type:"STRING", description:"Nueva hora 24h HH:MM, opcional" },
-        nueva_prioridad: { type:"STRING", enum:["none","low","medium","high"], description:"Nueva prioridad, opcional" }
+      parameters: { type:"object", properties: {
+        fecha: { type:"string", description:"Fecha en formato YYYY-MM-DD" },
+        texto_actual: { type:"string", description:"Texto actual (o parte) de la tarea a editar" },
+        nuevo_texto: { type:"string", description:"Nuevo texto, opcional" },
+        nueva_hora: { type:"string", description:"Nueva hora 24h HH:MM, opcional" },
+        nueva_prioridad: { type:"string", enum:["none","low","medium","high"], description:"Nueva prioridad, opcional" }
       }, required:["fecha","texto_actual"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "crear_nota",
       description: "Crea una nota rápida nueva.",
-      parameters: { type:"OBJECT", properties: {
-        titulo: { type:"STRING", description:"Título de la nota" },
-        contenido: { type:"STRING", description:"Contenido de la nota, opcional" }
+      parameters: { type:"object", properties: {
+        titulo: { type:"string", description:"Título de la nota" },
+        contenido: { type:"string", description:"Contenido de la nota, opcional" }
       }, required:["titulo"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "editar_nota",
       description: "Edita el título o contenido de una nota existente, buscándola por título.",
-      parameters: { type:"OBJECT", properties: {
-        titulo_actual: { type:"STRING", description:"Título actual (o parte) de la nota" },
-        nuevo_titulo: { type:"STRING", description:"Nuevo título, opcional" },
-        nuevo_contenido: { type:"STRING", description:"Nuevo contenido, opcional" }
+      parameters: { type:"object", properties: {
+        titulo_actual: { type:"string", description:"Título actual (o parte) de la nota" },
+        nuevo_titulo: { type:"string", description:"Nuevo título, opcional" },
+        nuevo_contenido: { type:"string", description:"Nuevo contenido, opcional" }
       }, required:["titulo_actual"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "eliminar_nota",
       description: "Elimina una nota, buscándola por título.",
-      parameters: { type:"OBJECT", properties: {
-        titulo: { type:"STRING", description:"Título (o parte) de la nota a eliminar" }
+      parameters: { type:"object", properties: {
+        titulo: { type:"string", description:"Título (o parte) de la nota a eliminar" }
       }, required:["titulo"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "crear_meta",
       description: "Crea una nueva meta / OKR.",
-      parameters: { type:"OBJECT", properties: {
-        titulo: { type:"STRING", description:"Título de la meta" },
-        descripcion: { type:"STRING", description:"Descripción, opcional" },
-        fecha_limite: { type:"STRING", description:"Fecha límite YYYY-MM-DD, opcional" },
-        categoria: { type:"STRING", enum:["personal","trabajo","estudio","salud","finanzas","otro"], description:"Categoría, opcional" }
+      parameters: { type:"object", properties: {
+        titulo: { type:"string", description:"Título de la meta" },
+        descripcion: { type:"string", description:"Descripción, opcional" },
+        fecha_limite: { type:"string", description:"Fecha límite YYYY-MM-DD, opcional" },
+        categoria: { type:"string", enum:["personal","trabajo","estudio","salud","finanzas","otro"], description:"Categoría, opcional" }
       }, required:["titulo"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "agregar_hito",
       description: "Agrega un hito (milestone) a una meta existente, buscándola por título.",
-      parameters: { type:"OBJECT", properties: {
-        meta_titulo: { type:"STRING", description:"Título (o parte) de la meta" },
-        hito_texto: { type:"STRING", description:"Texto del nuevo hito" }
+      parameters: { type:"object", properties: {
+        meta_titulo: { type:"string", description:"Título (o parte) de la meta" },
+        hito_texto: { type:"string", description:"Texto del nuevo hito" }
       }, required:["meta_titulo","hito_texto"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "completar_hito",
       description: "Marca como completado un hito de una meta, buscando meta y hito por texto.",
-      parameters: { type:"OBJECT", properties: {
-        meta_titulo: { type:"STRING", description:"Título (o parte) de la meta" },
-        hito_texto: { type:"STRING", description:"Texto (o parte) del hito a completar" }
+      parameters: { type:"object", properties: {
+        meta_titulo: { type:"string", description:"Título (o parte) de la meta" },
+        hito_texto: { type:"string", description:"Texto (o parte) del hito a completar" }
       }, required:["meta_titulo","hito_texto"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "eliminar_meta",
       description: "Elimina una meta completa, buscándola por título.",
-      parameters: { type:"OBJECT", properties: {
-        titulo: { type:"STRING", description:"Título (o parte) de la meta a eliminar" }
+      parameters: { type:"object", properties: {
+        titulo: { type:"string", description:"Título (o parte) de la meta a eliminar" }
       }, required:["titulo"] }
-    },
-    {
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "crear_proyecto",
       description: "Crea un proyecto nuevo.",
-      parameters: { type:"OBJECT", properties: {
-        nombre: { type:"STRING", description:"Nombre del proyecto" },
-        color: { type:"STRING", enum:["#7c6af7","#3b82f6","#22c55e","#f59e0b","#ef4444"], description:"Color, opcional" }
-      }, required:["nombre"] }
-    },
-    {
-      name: "agregar_tarea_proyecto",
-      description: "Agrega una tarea a un proyecto existente, buscándolo por nombre.",
-      parameters: { type:"OBJECT", properties: {
-        proyecto_nombre: { type:"STRING", description:"Nombre (o parte) del proyecto" },
-        texto: { type:"STRING", description:"Texto de la nueva tarea" }
-      }, required:["proyecto_nombre","texto"] }
-    },
-    {
-      name: "completar_tarea_proyecto",
-      description: "Marca como completada una tarea dentro de un proyecto.",
-      parameters: { type:"OBJECT", properties: {
-        proyecto_nombre: { type:"STRING", description:"Nombre (o parte) del proyecto" },
-        texto: { type:"STRING", description:"Texto (o parte) de la tarea a completar" }
-      }, required:["proyecto_nombre","texto"] }
-    },
-    {
-      name: "eliminar_proyecto",
-      description: "Elimina un proyecto completo, buscándolo por nombre.",
-      parameters: { type:"OBJECT", properties: {
-        nombre: { type:"STRING", description:"Nombre (o parte) del proyecto a eliminar" }
+      parameters: { type:"object", properties: {
+        nombre: { type:"string", description:"Nombre del proyecto" },
+        color: { type:"string", enum:["#7c6af7","#3b82f6","#22c55e","#f59e0b","#ef4444"], description:"Color, opcional" }
       }, required:["nombre"] }
     }
-  ]
-}];
+  },
+  {
+    type: "function",
+    function: {
+      name: "agregar_tarea_proyecto",
+      description: "Agrega una tarea a un proyecto existente, buscándolo por nombre.",
+      parameters: { type:"object", properties: {
+        proyecto_nombre: { type:"string", description:"Nombre (o parte) del proyecto" },
+        texto: { type:"string", description:"Texto de la nueva tarea" }
+      }, required:["proyecto_nombre","texto"] }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "completar_tarea_proyecto",
+      description: "Marca como completada una tarea dentro de un proyecto.",
+      parameters: { type:"object", properties: {
+        proyecto_nombre: { type:"string", description:"Nombre (o parte) del proyecto" },
+        texto: { type:"string", description:"Texto (o parte) de la tarea a completar" }
+      }, required:["proyecto_nombre","texto"] }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "eliminar_proyecto",
+      description: "Elimina un proyecto completo, buscándolo por nombre.",
+      parameters: { type:"object", properties: {
+        nombre: { type:"string", description:"Nombre (o parte) del proyecto a eliminar" }
+      }, required:["nombre"] }
+    }
+  }
+];
 
 function refreshAfterAIChange() {
   renderResumen();
@@ -4034,21 +4077,31 @@ REGLAS:
 Estado actual de la cuenta:
 ${buildAIContext()}`;
 
-    let contents = aiChatHistory.filter(m=>!m.thinking).map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.text }]
-    }));
+    // Solo se manda el historial reciente, no la conversación entera: menos
+    // tokens por llamada y menos probabilidad de que el modelo se confunda
+    // y repita acciones innecesarias.
+    let messages = [
+      { role: 'system', content: systemInstruction },
+      ...aiChatHistory.filter(m=>!m.thinking).slice(-10).map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }))
+    ];
 
     let finalText = null;
 
-    for (let i=0; i<5 && finalText===null; i++) {
-      const res = await fetch(GEMINI_ENDPOINT, {
+    for (let i=0; i<3 && finalText===null; i++) {
+      const res = await fetch(GROQ_ENDPOINT, {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          tools: GEMINI_TOOLS,
-          contents
+          model: GROQ_MODEL,
+          messages,
+          tools: GROQ_TOOLS,
+          tool_choice: 'auto'
         })
       });
       const data = await res.json();
@@ -4064,29 +4117,30 @@ ${buildAIContext()}`;
             (isQuota ? '\n\n(Se agotaron mis respuestas de IA por ahora — la acción sí se realizó. Intenta de nuevo en un minuto si quieres seguir conversando.)' : '');
           break;
         }
-        throw new Error(data.error.message || 'Error de la API de Gemini');
+        throw new Error(data.error.message || 'Error de la API de Groq');
       }
 
-      const candidate = data.candidates && data.candidates[0];
-      const parts = (candidate && candidate.content && candidate.content.parts) || [];
-      const functionCalls = parts.filter(p => p.functionCall);
+      const choice = data.choices && data.choices[0];
+      const msg = choice && choice.message;
+      const toolCalls = (msg && msg.tool_calls) || [];
 
-      if (functionCalls.length) {
-        contents.push({ role:'model', parts });
-        const responseParts = functionCalls.map(fc => {
-          const fn = AI_TOOLS[fc.functionCall.name];
+      if (toolCalls.length) {
+        messages.push(msg);
+        toolCalls.forEach(tc => {
+          const fn = AI_TOOLS[tc.function.name];
+          let args = {};
+          try { args = JSON.parse(tc.function.arguments || '{}'); } catch (e) {}
           let result;
           try {
-            result = fn ? fn(fc.functionCall.args||{}) : { ok:false, mensaje:'Función no reconocida.' };
+            result = fn ? fn(args) : { ok:false, mensaje:'Función no reconocida.' };
           } catch (e) {
             result = { ok:false, mensaje:'Error ejecutando la acción: ' + e.message };
           }
           toolResultsThisTurn.push(result.mensaje || (result.ok ? 'Listo.' : 'No se pudo completar la acción.'));
-          return { functionResponse: { name: fc.functionCall.name, response: result } };
+          messages.push({ role:'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
         });
-        contents.push({ role:'user', parts: responseParts });
       } else {
-        finalText = parts.map(p=>p.text||'').join('') || (toolResultsThisTurn.join(' ') || 'Listo.');
+        finalText = (msg && msg.content) || (toolResultsThisTurn.join(' ') || 'Listo.');
       }
     }
     if (finalText === null) finalText = toolResultsThisTurn.length ? toolResultsThisTurn.join(' ') : 'Hecho.';
