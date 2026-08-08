@@ -4018,6 +4018,8 @@ async function sendAIChatMessage() {
   const btn = document.getElementById('ai-chat-send-btn');
   btn.disabled = true;
 
+  let toolResultsThisTurn = []; // mensajes reales de acciones ya ejecutadas en este turno, visibles también si algo falla después
+
   try {
     const systemInstruction = `Eres el asistente de "Digital Minds", una app de tareas. Ayudas a ${currentUser}.
 
@@ -4038,6 +4040,7 @@ ${buildAIContext()}`;
     }));
 
     let finalText = null;
+
     for (let i=0; i<5 && finalText===null; i++) {
       const res = await fetch(GEMINI_ENDPOINT, {
         method:'POST',
@@ -4049,7 +4052,20 @@ ${buildAIContext()}`;
         })
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error.message || 'Error de la API de Gemini');
+
+      if (data.error) {
+        // Si ya ejecutamos alguna accion real antes de que fallara esta
+        // llamada (p.ej. por limite de cuota), la accion SI se hizo -- no
+        // mostramos un error crudo y confuso, confirmamos con lo que
+        // realmente paso segun el resultado de la funcion.
+        if (toolResultsThisTurn.length) {
+          const isQuota = /quota|rate.?limit/i.test(data.error.message||'');
+          finalText = toolResultsThisTurn.join(' ') +
+            (isQuota ? '\n\n(Se agotaron mis respuestas de IA por ahora — la acción sí se realizó. Intenta de nuevo en un minuto si quieres seguir conversando.)' : '');
+          break;
+        }
+        throw new Error(data.error.message || 'Error de la API de Gemini');
+      }
 
       const candidate = data.candidates && data.candidates[0];
       const parts = (candidate && candidate.content && candidate.content.parts) || [];
@@ -4065,17 +4081,26 @@ ${buildAIContext()}`;
           } catch (e) {
             result = { ok:false, mensaje:'Error ejecutando la acción: ' + e.message };
           }
+          toolResultsThisTurn.push(result.mensaje || (result.ok ? 'Listo.' : 'No se pudo completar la acción.'));
           return { functionResponse: { name: fc.functionCall.name, response: result } };
         });
         contents.push({ role:'user', parts: responseParts });
       } else {
-        finalText = parts.map(p=>p.text||'').join('') || 'Listo.';
+        finalText = parts.map(p=>p.text||'').join('') || (toolResultsThisTurn.join(' ') || 'Listo.');
       }
     }
-    if (finalText === null) finalText = 'Hecho.';
+    if (finalText === null) finalText = toolResultsThisTurn.length ? toolResultsThisTurn.join(' ') : 'Hecho.';
     aiChatHistory[aiChatHistory.length-1] = { role:'model', text: finalText };
   } catch (e) {
-    aiChatHistory[aiChatHistory.length-1] = { role:'model', text: 'No se pudo conectar con el asistente: ' + (e.message || 'intenta de nuevo') };
+    if (toolResultsThisTurn.length) {
+      const isQuota = /quota|rate.?limit/i.test(e.message||'');
+      aiChatHistory[aiChatHistory.length-1] = { role:'model', text:
+        toolResultsThisTurn.join(' ') +
+        (isQuota ? '\n\n(Se agotaron mis respuestas de IA por ahora — la acción sí se realizó. Intenta de nuevo en un minuto si quieres seguir conversando.)' : '')
+      };
+    } else {
+      aiChatHistory[aiChatHistory.length-1] = { role:'model', text: 'No se pudo conectar con el asistente: ' + (e.message || 'intenta de nuevo') };
+    }
   }
 
   btn.disabled = false;
