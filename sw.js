@@ -5,7 +5,7 @@
     para no interferir nunca con el login ni la sincronizacion.
 */
 
-const CACHE_NAME = 'digital-minds-v2';
+const CACHE_NAME = 'digital-minds-v4';
 
 const APP_SHELL = [
   './digital-minds.html',
@@ -45,9 +45,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Nunca cachear ni interceptar llamadas a Supabase o al Asistente IA (Gemini):
+  // Nunca cachear ni interceptar llamadas a Supabase o al Asistente IA (Llama API):
   // siempre a la red, directo, sin pasar por esta capa de cache.
-  if (url.hostname.endsWith('supabase.co') || url.hostname === 'generativelanguage.googleapis.com') {
+  if (url.hostname.endsWith('supabase.co') || url.hostname === 'api.llama.com') {
     return; // deja que el navegador maneje la peticion normalmente
   }
 
