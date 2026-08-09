@@ -3618,9 +3618,9 @@ async function deleteNote(id) {
 /* ============================================================
    ASISTENTE IA (Gemini, con capacidad real de modificar tareas)
 ============================================================ */
-const GROQ_API_KEY = "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";
-const GROQ_MODEL = "openai/gpt-oss-20b";
-const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+const LLAMA_API_KEY = "llx-6AiAXyFp9IHnSs8dbmjgASRQo8ANDdt88L5FBBzwd5WLGsfN";
+const LLAMA_MODEL = "Llama-4-Maverick-17B-128E-Instruct-FP8";
+const LLAMA_ENDPOINT = "https://api.llama.com/compat/v1/chat/completions";
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
 let aiChatBusy = false;
@@ -3782,7 +3782,7 @@ const AI_TOOLS = {
   }
 };
 
-const GROQ_TOOLS = [
+const LLAMA_TOOLS = [
   {
     type: "function",
     function: {
@@ -4069,6 +4069,7 @@ async function sendAIChatMessage() {
 REGLAS:
 - Responde en español, MUY breve y directo (2-4 líneas normalmente). Sin relleno, sin repetir lo que el usuario ya dijo.
 - Tienes funciones reales para crear, completar, editar y eliminar tareas, notas, metas (con sus hitos) y proyectos (con sus tareas). Cuando el usuario pida una de esas acciones, LLAMA a la función correspondiente — nunca digas que hiciste algo sin haber llamado a la función.
+- Si el usuario pide varias acciones en un mismo mensaje (por ejemplo, crear un proyecto y agregarle varias tareas de una vez), llama a TODAS las funciones necesarias juntas en tu misma respuesta, no de una en una — así no tiene que pedirte "y las demás" después.
 - Si el usuario no da fecha, usa la de hoy. Si no da hora o prioridad, créala sin hora / sin prioridad.
 - Después de ejecutar una función, confirma en una frase corta lo que realmente pasó (usa el resultado que te devuelve la función, no inventes detalles).
 - Si algo falla o falta información clave, pregunta solo lo estrictamente necesario, en una línea.
@@ -4090,17 +4091,17 @@ ${buildAIContext()}`;
 
     let finalText = null;
 
-    for (let i=0; i<3 && finalText===null; i++) {
-      const res = await fetch(GROQ_ENDPOINT, {
+    for (let i=0; i<6 && finalText===null; i++) {
+      const res = await fetch(LLAMA_ENDPOINT, {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
+          'Authorization': `Bearer ${LLAMA_API_KEY}`
         },
         body: JSON.stringify({
-          model: GROQ_MODEL,
+          model: LLAMA_MODEL,
           messages,
-          tools: GROQ_TOOLS,
+          tools: LLAMA_TOOLS,
           tool_choice: 'auto'
         })
       });
