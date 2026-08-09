@@ -3618,9 +3618,9 @@ async function deleteNote(id) {
 /* ============================================================
    ASISTENTE IA (Gemini, con capacidad real de modificar tareas)
 ============================================================ */
-const LLAMA_API_KEY = "llx-6AiAXyFp9IHnSs8dbmjgASRQo8ANDdt88L5FBBzwd5WLGsfN";
-const LLAMA_MODEL = "Llama-4-Maverick-17B-128E-Instruct-FP8";
-const LLAMA_ENDPOINT = "https://api.llama.com/compat/v1/chat/completions";
+const GROQ_API_KEY = "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";
+const GROQ_MODEL = "openai/gpt-oss-120b";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
 let aiChatBusy = false;
@@ -3782,7 +3782,7 @@ const AI_TOOLS = {
   }
 };
 
-const LLAMA_TOOLS = [
+const GROQ_TOOLS = [
   {
     type: "function",
     function: {
@@ -4092,16 +4092,16 @@ ${buildAIContext()}`;
     let finalText = null;
 
     for (let i=0; i<6 && finalText===null; i++) {
-      const res = await fetch(LLAMA_ENDPOINT, {
+      const res = await fetch(GROQ_ENDPOINT, {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          'Authorization': `Bearer ${LLAMA_API_KEY}`
+          'Authorization': `Bearer ${GROQ_API_KEY}`
         },
         body: JSON.stringify({
-          model: LLAMA_MODEL,
+          model: GROQ_MODEL,
           messages,
-          tools: LLAMA_TOOLS,
+          tools: GROQ_TOOLS,
           tool_choice: 'auto'
         })
       });
