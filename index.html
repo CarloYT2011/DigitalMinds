@@ -326,6 +326,23 @@
     .stat-card .stat-icon svg { width: 20px; height: 20px; }
     .stat-card .stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
     .stat-card .stat-lbl { font-size: .78rem; color: var(--text2); margin-top: 4px; }
+
+    /* ===== Banner de cuidado ambiental ===== */
+    .eco-banner {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 8px 14px; margin-bottom: 20px; width: fit-content; max-width: 100%;
+      background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.18);
+      border-radius: 99px; font-size: .8rem; color: var(--text2);
+    }
+    .eco-banner-icon { flex-shrink: 0; width: 20px; height: 20px; color: var(--success); display: flex; }
+    .eco-banner-icon svg { width: 100%; height: 100%; }
+    .eco-banner-text { transition: opacity .35s ease; }
+    .eco-banner-text.fading { opacity: 0; }
+    .eco-banner-icon.fading { opacity: 0; transition: opacity .35s ease; }
+    .eco-banner.special { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.22); }
+    .eco-banner.special .eco-banner-icon { color: var(--warning); }
+    .eco-banner.special .eco-banner-text { color: var(--text); font-weight: 600; }
+
     .week-progress { margin-bottom: 24px; }
     .progress-bar-wrap { background: var(--bg3); border-radius: 99px; height: 8px; overflow: hidden; margin-top: 8px; }
     .progress-bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width .5s ease; }
@@ -1127,6 +1144,8 @@
       .search-box { width: 140px; }
       .search-box:focus-within { width: 180px; }
       #shortcuts-btn { display: none !important; }
+      .eco-banner { padding: 7px 12px; font-size: .74rem; gap: 8px; }
+      .eco-banner-icon { width: 17px; height: 17px; }
 
       /* Candado anti-desborde: nada puede ser más ancho que la pantalla */
       .settings-grid { grid-template-columns: 1fr !important; }
@@ -1306,6 +1325,11 @@
       </header>
 
       <div class="content">
+
+        <div class="eco-banner" id="eco-banner">
+          <span class="eco-banner-icon" id="eco-banner-icon"></span>
+          <span class="eco-banner-text" id="eco-banner-text"></span>
+        </div>
 
         <!-- ===== RESUMEN ===== -->
         <section class="page-section active" id="section-resumen">
@@ -2407,6 +2431,7 @@ function renderResumen() {
       <div class="stat-lbl">Proyectos</div>
     </div>
   `;
+
 
   // Today tasks
   const el = document.getElementById('today-tasks-list');
@@ -4616,6 +4641,89 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+/* ============================================================
+   BANNER DE CUIDADO AMBIENTAL
+   Mensajes cortos rotativos con íconos SVG. En fechas
+   ambientales especiales, muestra un mensaje fijo de celebración.
+============================================================ */
+const ECO_LEAF_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20A7 7 0 0 1 4 13V8a5 5 0 0 1 5-5h5a2 2 0 0 1 2 2v5a7 7 0 0 1-7 7z"/><path d="M11 20v-8"/></svg>`;
+const ECO_DROP_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69s5 5.5 5 9.31a5 5 0 0 1-10 0c0-3.81 5-9.31 5-9.31z"/></svg>`;
+const ECO_RECYCLE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 12 3a1.784 1.784 0 0 1 1.545.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>`;
+const ECO_SUN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`;
+const ECO_TREE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22v-7"/><path d="M9 9a3 3 0 1 1 6 0 4 4 0 0 1 2 7.5H7A4 4 0 0 1 9 9z"/></svg>`;
+const ECO_GLOBE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+const ECO_PARTY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01M22 8h.01M15 2h.01M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12v0c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11v0c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98v0C9.52 4.9 9 5.51 9 6.22V7"/></svg>`;
+
+const ECO_TIPS = [
+  { icon: ECO_LEAF_ICON, text: 'Apaga las luces al salir de una habitación.' },
+  { icon: ECO_DROP_ICON, text: 'Cierra la llave mientras te enjabonas o cepillas los dientes.' },
+  { icon: ECO_RECYCLE_ICON, text: 'Separa tu basura: reciclar reduce lo que va al relleno sanitario.' },
+  { icon: ECO_SUN_ICON, text: 'Aprovecha la luz natural en vez de encender focos de día.' },
+  { icon: ECO_TREE_ICON, text: 'Una planta en casa también ayuda a purificar el aire.' },
+  { icon: ECO_DROP_ICON, text: 'Reutiliza el agua de la lluvia para regar tus plantas.' },
+  { icon: ECO_LEAF_ICON, text: 'Lleva tu propia bolsa reutilizable al hacer compras.' },
+  { icon: ECO_GLOBE_ICON, text: 'Camina o usa bici para trayectos cortos cuando puedas.' },
+];
+
+// Fechas ambientales especiales: { mes (1-12), día, mensaje }
+const ECO_SPECIAL_DATES = [
+  { month: 3,  day: 21, text: '¡Hoy es el Día Internacional de los Bosques!' },
+  { month: 3,  day: 22, text: '¡Hoy es el Día Mundial del Agua!' },
+  { month: 4,  day: 22, text: '¡Hoy es el Día de la Tierra!' },
+  { month: 5,  day: 17, text: '¡Hoy es el Día Mundial del Reciclaje!' },
+  { month: 6,  day: 5,  text: '¡Hoy es el Día Mundial del Medio Ambiente!' },
+  { month: 6,  day: 8,  text: '¡Hoy es el Día Mundial de los Océanos!' },
+  { month: 9,  day: 16, text: '¡Hoy es el Día de la Preservación de la Capa de Ozono!' },
+];
+
+let _ecoRotateTimer = null;
+
+function getEcoSpecialToday() {
+  const now = new Date();
+  const m = now.getMonth() + 1, d = now.getDate();
+  return ECO_SPECIAL_DATES.find(e => e.month === m && e.day === d) || null;
+}
+
+function setEcoBannerContent(icon, text) {
+  const iconEl = document.getElementById('eco-banner-icon');
+  const textEl = document.getElementById('eco-banner-text');
+  if (!iconEl || !textEl) return;
+  iconEl.classList.add('fading');
+  textEl.classList.add('fading');
+  setTimeout(() => {
+    iconEl.innerHTML = icon;
+    textEl.textContent = text;
+    iconEl.classList.remove('fading');
+    textEl.classList.remove('fading');
+  }, 350);
+}
+
+function initEcoBanner() {
+  const banner = document.getElementById('eco-banner');
+  if (!banner) return;
+
+  const special = getEcoSpecialToday();
+  if (special) {
+    banner.classList.add('special');
+    document.getElementById('eco-banner-icon').innerHTML = ECO_GLOBE_ICON + ECO_PARTY_ICON;
+    document.getElementById('eco-banner-icon').style.display = 'flex';
+    document.getElementById('eco-banner-icon').style.gap = '4px';
+    document.getElementById('eco-banner-text').textContent = special.text;
+    return; // sin rotación: el mensaje especial se queda fijo todo el día
+  }
+
+  let idx = 0;
+  document.getElementById('eco-banner-icon').innerHTML = ECO_TIPS[0].icon;
+  document.getElementById('eco-banner-text').textContent = ECO_TIPS[0].text;
+
+  _ecoRotateTimer = setInterval(() => {
+    idx = (idx + 1) % ECO_TIPS.length;
+    setEcoBannerContent(ECO_TIPS[idx].icon, ECO_TIPS[idx].text);
+  }, 7000);
+}
+
+initEcoBanner();
 </script>
   <!-- Selector de hora (12h, menu simple con AM/PM) -->
   <div class="time-popover" id="time-popover">
