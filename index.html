@@ -947,6 +947,7 @@
     .setting-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 0; border-bottom: 1px solid var(--border);
+      flex-wrap: wrap; gap: 8px 12px;
     }
     .setting-row:last-child { border-bottom: none; }
     .setting-lbl { font-size: .875rem; }
@@ -1124,6 +1125,16 @@
       .topbar { padding: 10px 16px; }
       .search-box { width: 140px; }
       .search-box:focus-within { width: 180px; }
+
+      /* Candado anti-desborde: nada puede ser más ancho que la pantalla */
+      .settings-grid, .grid-2, .grid-3, .grid-4, .stat-cards, .stats-kpi { grid-template-columns: 1fr !important; }
+      .card { width: 100%; max-width: 100%; overflow-x: hidden; }
+      .color-swatch { width: 22px; height: 22px; }
+      .color-row { gap: 6px; }
+      * { max-width: 100%; }
+      html, body, .layout, .main, .content, .page-section, .card,
+      .setting-row, .theme-btns, .color-row, .size-btns,
+      .topbar, .section-head, .section-actions { box-sizing: border-box; }
     }
   </style>
 </head>
@@ -1904,8 +1915,23 @@ async function doLogin() {
   const err = document.getElementById('login-error');
   err.style.display = 'none';
   if (!u || !p) { err.textContent = 'Completa usuario y contraseña'; err.style.display = 'block'; return; }
-  const { error } = await sb.auth.signInWithPassword({ email: usernameToEmail(u), password: p });
-  if (error) { err.textContent = authErrorMessage(error); err.style.display = 'block'; }
+  const { data, error } = await sb.auth.signInWithPassword({ email: usernameToEmail(u), password: p });
+  if (error) { err.textContent = authErrorMessage(error); err.style.display = 'block'; return; }
+  if (data?.user?.id) logLoginIp(data.user.id);
+}
+
+/* Registra la IP del login llamando a la Edge Function log-ip.
+   No bloquea el login: si falla, simplemente no se guarda la IP. */
+function logLoginIp(userId) {
+  fetch(`${SUPABASE_URL}/functions/v1/log-ip`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    },
+    body: JSON.stringify({ user_id: userId })
+  }).catch(() => {});
 }
 
 async function doRegister() {
