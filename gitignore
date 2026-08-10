@@ -1,0 +1,25 @@
+# Dependencias (se generan con npm install, nunca deben subirse)
+node_modules/
+
+# Archivos de entorno / claves sensibles
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+
+# Build / salidas generadas
+dist/
+build/
+*.log
