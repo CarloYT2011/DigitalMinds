@@ -4367,11 +4367,12 @@ function updateNotifBadge() {
 }
 
 /* ============================================================
-   NOTIFICACIONES DEL NAVEGADOR
+   NOTIFICACIONES DEL NAVEGADOR (locales, con la app abierta)
 ============================================================ */
 function requestNotifPermission() {
   const enabled = appData.settings.notif_enabled;
   if (enabled && Notification.permission==='default') Notification.requestPermission();
+  if (enabled && Notification.permission==='granted') subscribeToPush();
 }
 
 async function toggleNotifications() {
@@ -4380,7 +4381,7 @@ async function toggleNotifications() {
 
   if (enabling && Notification.permission === 'default') {
     const ok = await customConfirm(
-      'Digital Minds te avisará cuando llegue la hora de una tarea. Tu navegador te va a pedir confirmar el permiso justo después de esto.',
+      'Digital Minds te avisará cuando llegue la hora de una tarea, incluso si cierras esta pestaña. Tu navegador te va a pedir confirmar el permiso justo después de esto.',
       { title:'Activar notificaciones', okText:'Continuar', danger:false }
     );
     if (!ok) return;
@@ -4390,6 +4391,64 @@ async function toggleNotifications() {
   toggle.classList.toggle('on', enabling);
   appData.settings.notif_enabled = enabling;
   scheduleCloudSave();
+
+  if (enabling && Notification.permission === 'granted') {
+    subscribeToPush();
+  } else if (!enabling) {
+    unsubscribeFromPush();
+  }
+}
+
+/* ============================================================
+   NOTIFICACIONES PUSH (llegan aunque la app esté cerrada)
+============================================================ */
+const VAPID_PUBLIC_KEY = 'BC_7fxb5VueVBbHIQSRrWcdrwDX9_mw9NZonN9kl2h_3Ngs_sA8B9lSHa1zrMjXOStJVTM9_PfVBxtEKkKjzuUw';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!currentUID) return;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const json = sub.toJSON();
+    await sb.from('push_subscriptions').upsert({
+      user_id: currentUID,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth
+    }, { onConflict: 'endpoint' });
+  } catch (err) {
+    console.error('No se pudo suscribir a push:', err);
+  }
+}
+
+async function unsubscribeFromPush() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+      await sub.unsubscribe();
+    }
+  } catch (err) {
+    console.error('No se pudo cancelar la suscripción push:', err);
+  }
 }
 
 let notifCheckerInterval = null;
