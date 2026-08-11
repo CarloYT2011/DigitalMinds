@@ -4465,11 +4465,12 @@ function startNotifChecker() {
     (tasks[todayKey]||[]).forEach(t => {
       if (t.time && t.time===hm && !t.done && !t._notified) {
         t._notified = true;
+        t._pushed = true; // evita que el servidor la vuelva a notificar por push
         addNotif(t.text, `Hora programada: ${t.time}`);
         if (Notification.permission==='granted') {
           new Notification('Digital Minds', {
             body: `Es hora de: ${t.text} — ¡tú puedes! 💪`,
-            icon: NOTIF_ICON_DATA_URL,
+            icon: './icon-192.png',
             tag: `dm-task-${todayKey}-${t.time}`
           });
         }
