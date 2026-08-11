@@ -7,10 +7,10 @@
     y las muestra usando la API de notificaciones del sistema operativo.
 */
 
-const CACHE_NAME = 'digital-minds-v6';
+const CACHE_NAME = 'digital-minds-v7';
 
 const APP_SHELL = [
-  './digital-minds.html',
+  './',
   './manifest.json',
   './icon.svg',
   './icon.png',
@@ -90,7 +90,7 @@ self.addEventListener('push', (event) => {
     icon: './icon-192.png',
     badge: './icon-192.png',
     tag: data.tag || 'dm-push',
-    data: { url: data.url || './digital-minds.html' }
+    data: { url: data.url || './' }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -98,12 +98,12 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || './digital-minds.html';
+  const targetUrl = (event.notification.data && event.notification.data.url) || './';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
       for (const client of clientsArr) {
-        if (client.url.includes('digital-minds.html') && 'focus' in client) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
           return client.focus();
         }
       }
