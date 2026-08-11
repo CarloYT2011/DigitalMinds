@@ -3,6 +3,8 @@
   - Cachea el "app shell" (HTML, fuentes, iconos) para que abra offline/instantaneo.
   - Deja pasar sin tocar las peticiones a Supabase (auth y datos en la nube),
     para no interferir nunca con el login ni la sincronizacion.
+  - Recibe notificaciones push reales (funciona aunque la pestaña este cerrada)
+    y las muestra usando la API de notificaciones del sistema operativo.
 */
 
 const CACHE_NAME = 'digital-minds-v5';
@@ -65,6 +67,47 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => cached); // si no hay red y no hay cache, no queda mas remedio
+    })
+  );
+});
+
+/* ============================================================
+   NOTIFICACIONES PUSH
+   Se disparan desde el servidor (Edge Function de Supabase) y
+   llegan aqui aunque la pestaña/app este cerrada.
+============================================================ */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'Digital Minds', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || 'Digital Minds';
+  const options = {
+    body: data.body || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: data.tag || 'dm-push',
+    data: { url: data.url || './digital-minds.html' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || './digital-minds.html';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
+      for (const client of clientsArr) {
+        if (client.url.includes('digital-minds.html') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });
