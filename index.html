@@ -962,6 +962,7 @@
 
     /* ===================== PERSONALIZACIÓN ===================== */
     .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 16px; }
+    #section-cuenta .settings-grid { grid-template-columns: repeat(auto-fit, minmax(320px,1fr)); gap: 20px; }
     .setting-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 0; border-bottom: 1px solid var(--border);
@@ -2460,6 +2461,7 @@ function toggleTodayTask(day, idx) {
   const tasks = getTasks();
   if (!tasks[day]) return;
   tasks[day][idx].done = !tasks[day][idx].done;
+  if (tasks[day][idx].done) markTaskNotifsRead(tasks[day][idx].text);
   saveTasks(tasks);
   renderResumen();
   if (statsVisible()) renderStats();
@@ -2847,6 +2849,7 @@ function addTask(key) {
 function toggleTask(key, idx) {
   const tasks = getTasks();
   tasks[key][idx].done = !tasks[key][idx].done;
+  if (tasks[key][idx].done) markTaskNotifsRead(tasks[key][idx].text);
   saveTasks(tasks);
   renderAgenda();
   renderResumen();
@@ -2967,6 +2970,7 @@ function addCalTask() {
 function toggleCalTask(key, idx) {
   const tasks = getTasks();
   tasks[key][idx].done = !tasks[key][idx].done;
+  if (tasks[key][idx].done) markTaskNotifsRead(tasks[key][idx].text);
   saveTasks(tasks);
   renderCalDetail();
   if (statsVisible()) renderStats();
@@ -4362,6 +4366,22 @@ function markAllRead() {
   saveNotifs(notifs);
   renderNotifs();
   updateNotifBadge();
+}
+
+// Marca como leída cualquier notificación pendiente asociada al texto de
+// una tarea (se usa cuando la tarea se completa desde cualquier vista).
+function markTaskNotifsRead(taskText) {
+  if (!taskText) return;
+  const notifs = getNotifs();
+  let changed = false;
+  notifs.forEach(n => {
+    if (!n.read && n.title === taskText) { n.read = true; changed = true; }
+  });
+  if (changed) {
+    saveNotifs(notifs);
+    updateNotifBadge();
+    if (document.getElementById('notif-list')) renderNotifs();
+  }
 }
 
 function updateNotifBadge() {
