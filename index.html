@@ -3768,9 +3768,8 @@ async function deleteNote(id) {
 /* ============================================================
    ASISTENTE IA (Gemini, con capacidad real de modificar tareas)
 ============================================================ */
-const GROQ_API_KEY = "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";
 const GROQ_MODEL = "openai/gpt-oss-120b";
-const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_ENDPOINT = `${SUPABASE_URL}/functions/v1/groq-proxy`;
 
 let aiChatHistory = []; // [{role:'user'|'model', text}]
 let aiChatBusy = false;
@@ -4246,7 +4245,8 @@ ${buildAIContext()}`;
         method:'POST',
         headers:{
           'Content-Type':'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           model: GROQ_MODEL,
