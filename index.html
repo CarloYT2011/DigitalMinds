@@ -2121,6 +2121,29 @@ async function handleSession(session) {
   }
 }
 
+/* Trae los datos más recientes de la nube y actualiza la pantalla sin
+   recargar la página. Usa la misma lógica segura que la sincronización
+   en tiempo real (no pisa un guardado que acabas de hacer tú mismo).
+   El wrapper de escritorio (.exe) la llama cada pocos segundos, por si
+   la conexión en tiempo real se pausó mientras la ventana estaba
+   escondida en la bandeja del sistema. */
+async function forceSyncFromCloud() {
+  if (!currentUID || Date.now() < suppressRealtimeUntil) return;
+  try {
+    const { data, error } = await sb.from('app_data').select('*').eq('user_id', currentUID).single();
+    if (error || !data) return;
+    const incoming = mapDbRowToAppData(data);
+    if (JSON.stringify(incoming) === JSON.stringify(appData)) return;
+    appData = incoming;
+    loadSettings();
+    renderAll();
+    const activeNav = document.querySelector('.nav-item.active');
+    if (activeNav) navigate(activeNav.dataset.section);
+  } catch (e) {
+    console.error('No se pudo sincronizar con la nube:', e);
+  }
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   // Supabase vuelve a disparar este evento (p. ej. SIGNED_IN) cada vez que
   // regresas a la pestaña, aunque la sesión sea la misma de siempre. Si ya
