@@ -1575,7 +1575,18 @@
           </div>
           <div class="card ai-chat-card">
             <div class="ai-chat-messages" id="ai-chat-messages"></div>
+            <div id="ai-attached-file-chip" style="display:none;align-items:center;gap:8px;padding:8px 12px;margin:0 16px 8px;background:var(--bg3);border-radius:var(--radius-sm);font-size:.82rem;color:var(--text2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <span id="ai-attached-file-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+              <button onclick="removeAttachedFile()" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:2px;display:flex" title="Quitar archivo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
             <div class="ai-chat-input-row">
+              <input type="file" id="ai-file-input" accept=".xlsx,.xls,.csv,.txt" style="display:none" onchange="handleAIFileAttach(event)"/>
+              <button class="btn btn-ghost" onclick="document.getElementById('ai-file-input').click()" title="Adjuntar archivo (Excel, CSV o texto)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
               <input type="text" id="ai-chat-input" placeholder="Pregúntale algo, pídele sugerencias u organiza tu semana…" onkeydown="if(event.key==='Enter')sendAIChatMessage()"/>
               <button class="btn btn-accent" onclick="sendAIChatMessage()" id="ai-chat-send-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -1827,6 +1838,7 @@
 
 <!-- ===================== SUPABASE ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
   const SUPABASE_URL = "https://dluahapnlzglbtxqlvia.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdWFoYXBubHpnbGJ0eHFsdmlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODIzNDgsImV4cCI6MjEwMDg1ODM0OH0.rCAuHAp1zAEuzDK6oUS5WIlwaL9ktqKf4YrcLS4FMjY";
@@ -4218,15 +4230,72 @@ function renderAIChat() {
   el.scrollTop = el.scrollHeight;
 }
 
+let attachedFileText = null;
+let attachedFileName = null;
+
+function removeAttachedFile() {
+  attachedFileText = null;
+  attachedFileName = null;
+  document.getElementById('ai-attached-file-chip').style.display = 'none';
+  document.getElementById('ai-file-input').value = '';
+}
+
+async function handleAIFileAttach(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const MAX_CHARS = 8000; // limite razonable para no disparar el consumo de tokens
+  const name = file.name.toLowerCase();
+
+  try {
+    let text = '';
+
+    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const parts = [];
+      wb.SheetNames.forEach(sheetName => {
+        const sheet = wb.Sheets[sheetName];
+        const csv = XLSX.utils.sheet_to_csv(sheet);
+        parts.push(`--- Hoja: ${sheetName} ---\n${csv}`);
+      });
+      text = parts.join('\n\n');
+    } else {
+      // .csv y .txt: texto plano directo
+      text = await file.text();
+    }
+
+    if (text.length > MAX_CHARS) {
+      text = text.slice(0, MAX_CHARS) + `\n\n[... contenido recortado, el archivo es más largo ...]`;
+    }
+
+    attachedFileText = text;
+    attachedFileName = file.name;
+    document.getElementById('ai-attached-file-name').textContent = file.name;
+    document.getElementById('ai-attached-file-chip').style.display = 'flex';
+  } catch (e) {
+    toast('No se pudo leer ese archivo. Prueba con .xlsx, .csv o .txt', 'error');
+    console.error(e);
+  }
+}
+
 async function sendAIChatMessage() {
   if (aiChatBusy) return;
   const inp = document.getElementById('ai-chat-input');
   const text = inp.value.trim();
-  if (!text) return;
+  if (!text && !attachedFileText) return;
   inp.value = '';
   aiChatBusy = true;
 
-  aiChatHistory.push({ role:'user', text });
+  const fileNameForDisplay = attachedFileName;
+  const fileTextForThisMessage = attachedFileText;
+  removeAttachedFile();
+
+  const displayText = fileNameForDisplay
+    ? `${text || '(archivo adjunto)'} 📎 ${fileNameForDisplay}`
+    : text;
+
+  aiChatHistory.push({ role:'user', text: displayText });
   aiChatHistory.push({ role:'model', text:'Pensando…', thinking:true });
   renderAIChat();
 
@@ -4246,6 +4315,9 @@ REGLAS:
 - Después de ejecutar una función, confirma en una frase corta lo que realmente pasó (usa el resultado que te devuelve la función, no inventes detalles).
 - Si algo falla o falta información clave, pregunta solo lo estrictamente necesario, en una línea.
 - Sé siempre útil y propositivo: si detectas que algo se puede organizar mejor, sugiérelo brevemente.
+- NUNCA vuelvas a llamar una función solo porque el usuario dijo "gracias", "ok", "genial", "perfecto" o cualquier mensaje de puro agradecimiento/confirmación sin una petición nueva y explícita. Esos mensajes se responden de forma breve y conversacional, sin ejecutar ninguna función.
+- Solo llama una función cuando el mensaje MÁS RECIENTE del usuario contiene una petición de acción nueva y concreta. No repitas una acción ya realizada en mensajes anteriores de la conversación a menos que el usuario la pida otra vez explícitamente.
+- El usuario puede adjuntar un archivo (Excel, CSV o texto). Si viene contenido de un archivo adjunto en el mensaje, solo interprétalo y crea/edita cosas con él si el usuario lo pidió explícitamente en el mismo mensaje o en uno anterior cercano. Si el archivo llegó sin instrucciones claras de qué hacer con él, pregúntale brevemente qué quiere que hagas antes de crear nada.
 
 Estado actual de la cuenta:
 ${buildAIContext()}`;
@@ -4260,6 +4332,13 @@ ${buildAIContext()}`;
         content: m.text
       }))
     ];
+
+    // Si el usuario adjuntó un archivo, se agrega el contenido real solo a
+    // esta llamada (no queda guardado en el historial visible del chat).
+    if (fileTextForThisMessage) {
+      const lastMsg = messages[messages.length - 1];
+      lastMsg.content += `\n\n[Contenido del archivo adjunto "${fileNameForDisplay}"]:\n${fileTextForThisMessage}\n\nSolo interpreta y usa este contenido si el usuario te lo pide explícitamente (por ejemplo, "créame tareas con esto" o "agrega estos datos a mi cuenta"). Si el usuario solo lo adjuntó para que lo revises o resumas, no crees nada automáticamente.`;
+    }
 
     let finalText = null;
 
@@ -4519,7 +4598,20 @@ function startNotifChecker() {
         t._pushed = true; // evita que el servidor la vuelva a notificar por push
         firedAny = true;
         addNotif(t.text, `Hora programada: ${t.time}`);
-        toast(t.text, 'reminder', `Hora programada · ${t.time}`);
+        if (document.hidden) {
+          // La pestaña está abierta pero no la estás viendo (otra pestaña
+          // activa, o la ventana minimizada): notificación real del sistema.
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('Digital Minds', {
+              body: `Es hora de: ${t.text} — ¡tú puedes! 💪`,
+              icon: './icon-192.png',
+              tag: `dm-task-${todayKey}-${t.time}`
+            });
+          }
+        } else {
+          // La estás viendo activamente: solo el aviso interno con el reloj SVG.
+          toast(t.text, 'reminder', `Hora programada · ${t.time}`);
+        }
       }
     });
     appData.tasks = tasks;
