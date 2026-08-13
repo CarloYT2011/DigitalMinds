@@ -4528,9 +4528,12 @@ function startNotifChecker() {
       // justo después del aviso, igual queda registrado en la nube al toque,
       // para que no se repita si vuelves a entrar dentro del mismo minuto.
       saveTasksImmediate();
-    } else {
-      saveTasks(tasks);
     }
+    // Si nada cambió (firedAny=false), NO guardamos nada. Antes esta línea
+    // guardaba igual cada segundo aunque no hubiera pasado nada, lo cual
+    // podía sobreescribir cambios más recientes hechos desde otro
+    // dispositivo/sesión con una copia local que todavía no se había
+    // actualizado. Sin guardado innecesario, ese riesgo desaparece.
   }, 1000);
 }
 

@@ -7,7 +7,7 @@
     y las muestra usando la API de notificaciones del sistema operativo.
 */
 
-const CACHE_NAME = 'digital-minds-v14';
+const CACHE_NAME = 'digital-minds-v15';
 
 const APP_SHELL = [
   './',
