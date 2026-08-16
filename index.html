@@ -421,8 +421,8 @@
     .task-list { display: flex; flex-direction: column; gap: 8px; }
     .task-list:not(:empty) { margin-bottom: 12px; }
     .task-item {
-      display: flex; align-items: flex-start; gap: 9px;
-      padding: calc(var(--task-pad-v) + 2px) calc(var(--task-pad-h) + 4px); border-radius: 10px;
+      display: flex; align-items: center; gap: 12px;
+      padding: var(--task-pad-v) var(--task-pad-h); border-radius: 10px;
       background: var(--bg3); font-size: var(--task-font);
       cursor: pointer; transition: var(--transition), transform .15s ease;
       position: relative; border-left: 3px solid transparent;
