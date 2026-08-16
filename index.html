@@ -45,9 +45,9 @@
       --font-family: 'Space Grotesk', sans-serif;
       --sidebar-w: 220px;
       --transition: .2s ease;
-      --task-pad-v: 7px;
-      --task-pad-h: 8px;
-      --task-font: .8rem;
+      --task-pad-v: 12px;
+      --task-pad-h: 14px;
+      --task-font: 0.95rem;
     }
     [data-theme="light"] {
       --bg: #f4f4f8;
@@ -570,7 +570,7 @@
       padding: 4px 4px 12px;
     }
     .ai-msg {
-      padding: 10px 14px; border-radius: 14px;
+      max-width: 78%; padding: 10px 14px; border-radius: 14px;
       font-size: .875rem; line-height: 1.55; word-break: break-word;
       white-space: pre-wrap;
     }
@@ -585,9 +585,6 @@
     .ai-msg-bot.thinking { color: var(--text3); font-style: italic; }
     .ai-msg-row { display: flex; align-items: flex-end; gap: 8px; }
     .ai-msg-row.user { flex-direction: row-reverse; }
-    .ai-msg-wrap { display: flex; flex-direction: column; max-width: 78%; min-width: 0; }
-    .ai-msg-row.user .ai-msg-wrap { align-items: flex-end; }
-    .ai-msg-row:not(.user) .ai-msg-wrap { align-items: flex-start; }
     .ai-avatar {
       width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
       display: grid; place-items: center; font-size: .72rem; font-weight: 700;
@@ -4289,7 +4286,7 @@ function renderAIChat() {
     return `
       <div class="ai-msg-row${isUser?' user':''}">
         ${avatar}
-        <div class="ai-msg-wrap">
+        <div>
           <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${fileChip}${m.text ? formatAIText(m.text) : ''}</div>
           ${speakBtn}
         </div>
