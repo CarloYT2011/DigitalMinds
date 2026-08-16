@@ -7,7 +7,7 @@
   <meta name="description" content="Tus tareas, compromisos o citas organizalas a tiempo en un solo lugar. Conoce nuestro proyecto 😀👇🏻">
   <meta property="og:title" content="Digital Minds">
   <meta property="og:description" content="Tus tareas, compromisos o citas organizalas a tiempo en un solo lugar. Conoce nuestro proyecto 😀👇🏻">
-  <meta property="og:image" content="icon.png">
+  <meta property="og:image" content="https://digital-minds-jade.vercel.app/icon.png">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="alternate icon" href="icon.png">
@@ -592,13 +592,37 @@
     .ai-avatar.bot { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-soft); }
     .ai-avatar.bot svg { width: 15px; height: 15px; }
     .ai-avatar.user { background: var(--bg4); color: var(--text2); }
-    .ai-chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
-    .ai-chat-input-row input {
+    .ai-chat-input-row { display: flex; gap: 8px; margin-top: 10px; align-items: flex-end; }
+    .ai-chat-input-row input, .ai-chat-input-row textarea {
       flex: 1; padding: 12px 14px; border-radius: var(--radius-sm);
       border: 1px solid var(--border); background: var(--bg3);
       color: var(--text); font-size: .875rem; outline: none; transition: var(--transition);
     }
-    .ai-chat-input-row input:focus { border-color: var(--accent); }
+    .ai-chat-input-row input:focus, .ai-chat-input-row textarea:focus { border-color: var(--accent); }
+    .ai-chat-input-row textarea {
+      resize: none; font-family: inherit; line-height: 1.4;
+      max-height: 160px; overflow-y: auto;
+    }
+
+    .ai-file-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      background: rgba(255,255,255,.08); margin-bottom: 6px;
+      font-size: .8rem; max-width: 260px; width: fit-content;
+    }
+    .ai-msg-user .ai-file-chip { background: rgba(255,255,255,.16); }
+    .ai-file-chip svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .ai-file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ai-mic-btn.recording { background: var(--danger); color: #fff; border-color: var(--danger); animation: ai-mic-pulse 1.2s ease-in-out infinite; }
+    @keyframes ai-mic-pulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+    .ai-speak-btn {
+      background: none; border: none; color: var(--text3); cursor: pointer;
+      padding: 4px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 6px; margin-top: 6px; transition: var(--transition);
+    }
+    .ai-speak-btn:hover { background: var(--bg4); color: var(--text); }
+    .ai-speak-btn.speaking { color: var(--accent); }
+    .ai-speak-btn svg { width: 15px; height: 15px; }
 
     /* ===================== CALENDARIO ===================== */
     .cal-wrap { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
@@ -1580,7 +1604,7 @@
           </div>
           <div class="card ai-chat-card">
             <div class="ai-chat-messages" id="ai-chat-messages"></div>
-            <div id="ai-attached-file-chip" style="display:none;align-items:center;gap:8px;padding:8px 12px;margin:0 16px 8px;background:var(--bg3);border-radius:var(--radius-sm);font-size:.82rem;color:var(--text2)">
+            <div id="ai-attached-file-chip" style="display:none;align-items:center;gap:8px;padding:8px 12px;margin:0 16px 8px;background:var(--bg3);border-radius:var(--radius-sm);font-size:.82rem;color:var(--text2);width:fit-content;max-width:calc(100% - 32px)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               <span id="ai-attached-file-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
               <button onclick="removeAttachedFile()" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:2px;display:flex" title="Quitar archivo">
@@ -1592,7 +1616,10 @@
               <button class="btn btn-ghost" onclick="document.getElementById('ai-file-input').click()" title="Adjuntar archivo (Excel, CSV o texto)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
-              <input type="text" id="ai-chat-input" placeholder="Pregúntale algo, pídele sugerencias u organiza tu semana…" onkeydown="if(event.key==='Enter')sendAIChatMessage()"/>
+              <button class="btn btn-ghost" id="ai-mic-btn" onclick="toggleVoiceInput()" title="Dictar por voz" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <textarea id="ai-chat-input" rows="1" placeholder="Pregúntale algo, pídele sugerencias u organiza tu semana…" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendAIChatMessage();}" oninput="autoResizeAIInput(this)"></textarea>
               <button class="btn btn-accent" onclick="sendAIChatMessage()" id="ai-chat-send-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 Enviar
@@ -2108,6 +2135,7 @@ async function handleSession(session) {
     renderAll();
     requestNotifPermission();
     startNotifChecker();
+    scheduleAndroidAlarmsIfNeeded();
     navigate('resumen');
     appInitialized = true;
 
@@ -2352,7 +2380,28 @@ async function deleteAccount() {
    DATOS POR USUARIO (sincronizados con Supabase, en memoria en appData)
 ============================================================ */
 function getTasks() { return appData.tasks; }
-function saveTasks(t) { appData.tasks = t; scheduleCloudSave(); }
+function saveTasks(t) { appData.tasks = t; scheduleCloudSave(); scheduleAndroidAlarmsIfNeeded(); }
+
+/* Le avisa al puente de Android (si existe) cuáles son las tareas de HOY
+   con hora pendientes, para que programe una alarma exacta por cada una.
+   Esto es lo que permite que las notificaciones lleguen en el APK aunque
+   la app esté completamente cerrada, sin necesidad de Firebase. No hace
+   nada en la web ni en el .exe (ahí AndroidNotificationBridge no existe). */
+function scheduleAndroidAlarmsIfNeeded() {
+  if (!window.AndroidNotificationBridge || typeof window.AndroidNotificationBridge.scheduleTodayAlarms !== 'function') return;
+  if (!appData.settings || !appData.settings.notif_enabled) return;
+
+  try {
+    const todayKey = getToday();
+    const tasks = getTasks();
+    const todayTasks = (tasks[todayKey] || []).filter(t => t.time && !t.done);
+    window.AndroidNotificationBridge.scheduleTodayAlarms(JSON.stringify(
+      todayTasks.map(t => ({ id: t.id, text: t.text, time: t.time }))
+    ));
+  } catch (e) {
+    console.error('No se pudieron programar las alarmas de Android:', e);
+  }
+}
 
 function getGoals() { return appData.goals; }
 function saveGoals(g) { appData.goals = g; scheduleCloudSave(); }
@@ -2393,7 +2442,7 @@ function navigate(sec) {
   if (sec==='metas') renderGoals();
   if (sec==='proyectos') renderProjects();
   if (sec==='notas') renderNotes();
-  if (sec==='asistente') renderAIChat();
+  if (sec==='asistente') { renderAIChat(); initVoiceButtons(); }
   if (sec==='notificaciones') renderNotifs();
   if (sec==='pomodoro') renderPomoTaskSel();
 
@@ -4220,15 +4269,27 @@ function renderAIChat() {
     return;
   }
   const userInitial = (currentUser||'?')[0].toUpperCase();
-  el.innerHTML = aiChatHistory.map(m => {
+  el.innerHTML = aiChatHistory.map((m, idx) => {
     const isUser = m.role === 'user';
     const avatar = isUser
       ? `<div class="ai-avatar user">${userInitial}</div>`
       : `<div class="ai-avatar bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h.5A2.5 2.5 0 0 1 19 9.5v6a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 15.5v-6A2.5 2.5 0 0 1 7.5 7H8V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M9 17h6"/></svg></div>`;
+    const fileChip = m.fileName ? `
+      <div class="ai-file-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <span>${escapeAttr(m.fileName)}</span>
+      </div>` : '';
+    const speakBtn = (!isUser && !m.thinking && m.text) ? `
+      <button class="ai-speak-btn" id="ai-speak-btn-${idx}" onclick="speakAIMessage(${idx})" title="Leer en voz alta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      </button>` : '';
     return `
       <div class="ai-msg-row${isUser?' user':''}">
         ${avatar}
-        <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${formatAIText(m.text)}</div>
+        <div>
+          <div class="ai-msg ${isUser?'ai-msg-user':'ai-msg-bot'}${m.thinking?' thinking':''}">${fileChip}${m.text ? formatAIText(m.text) : ''}</div>
+          ${speakBtn}
+        </div>
       </div>
     `;
   }).join('');
@@ -4237,6 +4298,94 @@ function renderAIChat() {
 
 let attachedFileText = null;
 let attachedFileName = null;
+
+/* ============================================================
+   DICTADO POR VOZ Y LECTURA EN VOZ ALTA (Asistente IA)
+   Usa las APIs nativas del navegador. Si el navegador/WebView no las
+   soporta (pasa con frecuencia en el WebView de Android), los botones
+   quedan ocultos en vez de mostrar algo roto.
+============================================================ */
+let speechRecognizer = null;
+let isRecordingVoice = false;
+
+function initVoiceButtons() {
+  const micBtn = document.getElementById('ai-mic-btn');
+  if (!micBtn) return;
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  micBtn.style.display = SpeechRecognitionAPI ? '' : 'none';
+}
+
+function toggleVoiceInput() {
+  if (isRecordingVoice) {
+    speechRecognizer?.stop();
+    return;
+  }
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionAPI) {
+    toast('Tu navegador no soporta dictado por voz', 'error');
+    return;
+  }
+
+  speechRecognizer = new SpeechRecognitionAPI();
+  speechRecognizer.lang = 'es-PE';
+  speechRecognizer.interimResults = false;
+  speechRecognizer.maxAlternatives = 1;
+
+  const micBtn = document.getElementById('ai-mic-btn');
+  const inp = document.getElementById('ai-chat-input');
+
+  speechRecognizer.onstart = () => {
+    isRecordingVoice = true;
+    micBtn.classList.add('recording');
+  };
+  speechRecognizer.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    inp.value = inp.value ? `${inp.value} ${transcript}` : transcript;
+    autoResizeAIInput(inp);
+    inp.focus();
+  };
+  speechRecognizer.onerror = (event) => {
+    console.error('Error de dictado por voz:', event.error);
+    if (event.error !== 'aborted' && event.error !== 'no-speech') {
+      toast('No se pudo escuchar bien, intenta de nuevo', 'error');
+    }
+  };
+  speechRecognizer.onend = () => {
+    isRecordingVoice = false;
+    micBtn.classList.remove('recording');
+  };
+
+  speechRecognizer.start();
+}
+
+function speakAIMessage(idx) {
+  if (!('speechSynthesis' in window)) return;
+  const msg = aiChatHistory[idx];
+  if (!msg) return;
+  const btn = document.getElementById(`ai-speak-btn-${idx}`);
+
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    document.querySelectorAll('.ai-speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+    return;
+  }
+
+  // Quita markdown básico (asteriscos, numerales) para que no lo lea en voz alta.
+  const plainText = msg.text.replace(/[*_#`]/g, '');
+
+  const utterance = new SpeechSynthesisUtterance(plainText);
+  utterance.lang = 'es-ES';
+  utterance.rate = 1;
+  utterance.onstart = () => btn?.classList.add('speaking');
+  utterance.onend = () => btn?.classList.remove('speaking');
+  utterance.onerror = () => btn?.classList.remove('speaking');
+  window.speechSynthesis.speak(utterance);
+}
+
+function autoResizeAIInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
 
 function removeAttachedFile() {
   attachedFileText = null;
@@ -4277,7 +4426,7 @@ async function handleAIFileAttach(event) {
     attachedFileText = text;
     attachedFileName = file.name;
     document.getElementById('ai-attached-file-name').textContent = file.name;
-    document.getElementById('ai-attached-file-chip').style.display = 'flex';
+    document.getElementById('ai-attached-file-chip').style.display = 'inline-flex';
   } catch (e) {
     toast('No se pudo leer ese archivo. Prueba con .xlsx, .csv o .txt', 'error');
     console.error(e);
@@ -4290,17 +4439,23 @@ async function sendAIChatMessage() {
   const text = inp.value.trim();
   if (!text && !attachedFileText) return;
   inp.value = '';
+  autoResizeAIInput(inp);
   aiChatBusy = true;
 
   const fileNameForDisplay = attachedFileName;
   const fileTextForThisMessage = attachedFileText;
   removeAttachedFile();
 
-  const displayText = fileNameForDisplay
-    ? `${text || '(archivo adjunto)'} 📎 ${fileNameForDisplay}`
+  // "text": lo que se ve en el chat (limpio, sin el contenido crudo del archivo).
+  // "apiText": lo que realmente recibe la IA — incluye el contenido del
+  // archivo, y queda guardado así en todo el historial de la conversación
+  // (no solo en este mensaje), para que la IA lo "recuerde" en respuestas
+  // posteriores en vez de perderlo apenas cambias de tema.
+  const apiText = fileTextForThisMessage
+    ? `${text || '(archivo adjunto, sin mensaje adicional)'}\n\n[Contenido del archivo adjunto "${fileNameForDisplay}"]:\n${fileTextForThisMessage}\n\nSolo interpreta y usa este contenido si el usuario te lo pide explícitamente. Si no está claro qué hacer con él, pregúntale antes de crear nada.`
     : text;
 
-  aiChatHistory.push({ role:'user', text: displayText });
+  aiChatHistory.push({ role:'user', text, fileName: fileNameForDisplay, apiText });
   aiChatHistory.push({ role:'model', text:'Pensando…', thinking:true });
   renderAIChat();
 
@@ -4329,21 +4484,16 @@ ${buildAIContext()}`;
 
     // Solo se manda el historial reciente, no la conversación entera: menos
     // tokens por llamada y menos probabilidad de que el modelo se confunda
-    // y repita acciones innecesarias.
+    // y repita acciones innecesarias. Se usa "apiText" (con el contenido real
+    // de cualquier archivo adjunto) en vez de "text" (que es solo lo visible
+    // en pantalla), para que la IA no "olvide" un archivo en turnos futuros.
     let messages = [
       { role: 'system', content: systemInstruction },
       ...aiChatHistory.filter(m=>!m.thinking).slice(-10).map(m => ({
         role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text
+        content: m.apiText || m.text
       }))
     ];
-
-    // Si el usuario adjuntó un archivo, se agrega el contenido real solo a
-    // esta llamada (no queda guardado en el historial visible del chat).
-    if (fileTextForThisMessage) {
-      const lastMsg = messages[messages.length - 1];
-      lastMsg.content += `\n\n[Contenido del archivo adjunto "${fileNameForDisplay}"]:\n${fileTextForThisMessage}\n\nSolo interpreta y usa este contenido si el usuario te lo pide explícitamente (por ejemplo, "créame tareas con esto" o "agrega estos datos a mi cuenta"). Si el usuario solo lo adjuntó para que lo revises o resumas, no crees nada automáticamente.`;
-    }
 
     let finalText = null;
 
@@ -4531,6 +4681,22 @@ async function toggleNotifications() {
   } else if (!enabling) {
     unsubscribeFromPush();
   }
+
+  // Android: pide el permiso especial de "Alarmas y recordatorios" si hace
+  // falta, y programa las alarmas exactas de hoy. No hace nada en web/.exe.
+  if (enabling && window.AndroidNotificationBridge) {
+    try {
+      if (typeof window.AndroidNotificationBridge.canScheduleExactAlarms === 'function'
+          && !window.AndroidNotificationBridge.canScheduleExactAlarms()) {
+        await customConfirm(
+          'Para que las notificaciones lleguen puntuales aunque cierres la app, Android necesita un permiso extra ("Alarmas y recordatorios"). Te vamos a llevar a esa pantalla — actívalo y vuelve.',
+          { title:'Un paso más', okText:'Ir a ajustes', danger:false }
+        );
+        window.AndroidNotificationBridge.requestExactAlarmPermission();
+      }
+    } catch (e) { /* no es crítico si falla, sigue sin bloquear */ }
+    scheduleAndroidAlarmsIfNeeded();
+  }
 }
 
 /* ============================================================
@@ -4603,9 +4769,16 @@ function startNotifChecker() {
         t._pushed = true; // evita que el servidor la vuelva a notificar por push
         firedAny = true;
         addNotif(t.text, `Hora programada: ${t.time}`);
-        if (document.hidden) {
-          // La pestaña está abierta pero no la estás viendo (otra pestaña
-          // activa, o la ventana minimizada): notificación real del sistema.
+        if (window.AndroidNotificationBridge) {
+          // En el APK, las alarmas exactas de Android ya se encargan de
+          // avisar (funcionan igual con la app abierta o cerrada) — si
+          // también disparamos la notificación nativa desde aquí, sale
+          // duplicada. Solo mostramos el aviso interno cuando la estás
+          // viendo activamente; la alarma cubre el resto por su cuenta.
+          if (!document.hidden) toast(t.text, 'reminder', `Hora programada · ${t.time}`);
+        } else if (document.hidden) {
+          // Web/.exe: la pestaña está abierta pero no la estás viendo (otra
+          // pestaña activa, o la ventana minimizada): notificación real del sistema.
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             new Notification('Digital Minds', {
               body: `Es hora de: ${t.text} — ¡tú puedes! 💪`,
