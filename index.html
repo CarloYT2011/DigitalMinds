@@ -45,9 +45,9 @@
       --font-family: 'Space Grotesk', sans-serif;
       --sidebar-w: 220px;
       --transition: .2s ease;
-      --task-pad-v: 12px;
-      --task-pad-h: 14px;
-      --task-font: 0.95rem;
+      --task-pad-v: 7px;
+      --task-pad-h: 8px;
+      --task-font: .8rem;
     }
     [data-theme="light"] {
       --bg: #f4f4f8;
@@ -275,7 +275,7 @@
       background: var(--accent); display: none;
     }
     .notif-dot.show { display: block; }
-    .content { padding: 28px; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .content { padding: 28px; flex: 1; }
     .page-section { display: none; animation: fadeIn .25s ease; }
     .page-section.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -421,13 +421,12 @@
     .task-list { display: flex; flex-direction: column; gap: 8px; }
     .task-list:not(:empty) { margin-bottom: 12px; }
     .task-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: var(--task-pad-v) var(--task-pad-h); border-radius: 10px;
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: calc(var(--task-pad-v) + 2px) calc(var(--task-pad-h) + 4px); border-radius: 10px;
       background: var(--bg3); font-size: var(--task-font);
       cursor: pointer; transition: var(--transition), transform .15s ease;
       position: relative; border-left: 3px solid transparent;
       width: 100%;
-      min-width: 50ch; /* Forzar el ancho mínimo equivalente a ~50 caracteres */
     }
     .task-item[data-priority="high"] { border-left-color: var(--danger); }
     .task-item[data-priority="medium"] { border-left-color: var(--warning); }
@@ -444,7 +443,8 @@
     .task-item.done .task-check { background: var(--success); border-color: var(--success); }
     .task-item.done .task-check::after { content: '✓'; font-size: .6rem; font-weight: 700; color: #fff; }
     .task-item.done .task-txt { text-decoration: line-through; color: var(--text3); }
-    .task-txt { flex: 1; min-width: 45ch; line-height: 1.5; word-break: break-word; overflow-wrap: anywhere; }    .task-text-span { flex: 1; min-width: 0; word-break: break-word; }
+    .task-txt { flex: 1; min-width: 0; line-height: 1.4; word-break: break-word; }
+    .task-text-span { flex: 1; min-width: 0; word-break: break-word; }
     .task-time {
       font-size: .68rem; font-weight: 700; color: var(--accent); white-space: nowrap;
       background: var(--accent-soft); padding: 2px 8px; border-radius: 99px;
@@ -537,7 +537,7 @@
     .tp-num {
       width: 38px; padding: 8px 0; border: none; background: transparent; outline: none;
       color: var(--text); font-size: 1.3rem; font-weight: 700; text-align: center;
-      -moz-appearance: textfield; 
+      -moz-appearance: textfield;
     }
     .tp-num::-webkit-outer-spin-button, .tp-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .tp-sep { color: var(--text3); font-weight: 700; font-size: 1.15rem; }
@@ -569,15 +569,9 @@
       display: flex; flex-direction: column; gap: 10px;
       padding: 4px 4px 12px;
     }
-   .ai-msg {
-      width: fit-content;
-      min-width: 320px;          /* Ocupa un ancho mínimo amplio */
-      max-width: 88%;            /* Aprovecha hasta el 88% del espacio del contenedor */
-      padding: 12px 18px;        /* Mayor relleno interno */
-      border-radius: 14px;
-      font-size: .9rem; 
-      line-height: 1.55; 
-      word-break: break-word;
+    .ai-msg {
+      max-width: 78%; padding: 10px 14px; border-radius: 14px;
+      font-size: .875rem; line-height: 1.55; word-break: break-word;
       white-space: pre-wrap;
     }
     .ai-msg-user {
